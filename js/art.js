@@ -55,7 +55,15 @@
     file: '<path d="M6 3h8l5 5v13H6zM14 3v5h5"/>',
     heart: '<path d="M12 20s-8-4.7-8-10.3A4.5 4.5 0 0112 7a4.5 4.5 0 018 2.7C20 15.3 12 20 12 20z"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
-    bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
+    bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    balloon: '<path d="M12 3a6 6 0 016 6c0 4-3 7-6 8-3-1-6-4-6-8a6 6 0 016-6zM12 17v2l-1.5 2M12 19l1.5 2"/>',
+    hammer: '<path d="M13 4l7 7-3 3-7-7zM11 9L3 17l4 4 8-8"/>',
+    gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9M12 8v13M12 8c-2-4-6-3-5 0 .5 1.5 3 1 5 0zM12 8c2-4 6-3 5 0-.5 1.5-3 1-5 0z"/>',
+    plane: '<path d="M2 12l20-8-8 20-3-8z"/>',
+    sprout: '<path d="M12 21v-9M12 12c0-4-3-6-7-6 0 4 3 6 7 6zM12 14c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+    rocket: '<path d="M12 3c4 2 6 6 5 11l-3 2h-4l-3-2c-1-5 1-9 5-11zM9 18l-3 3M15 18l3 3M12 9h.01"/>',
+    dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 9h.01M12 12h.01M9 15h.01M15 15h.01"/>',
+    calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>'
   };
 
   function icon(name, size, extra) {
@@ -127,10 +135,22 @@
     }
   };
 
+
+  var EMO = {};
+  var PALG = [['#1E40AF','#7C3AED'],['#0E7490','#2563EB'],['#6D28D9','#DB2777'],['#047857','#0EA5E9'],['#B45309','#DC2626']];
+  function generic(kind, v) {
+    var e = EMO[kind] || '🎮', c = PALG[(kind.length + v) % PALG.length], s = '';
+    for (var i = 0; i < 6; i++) s += '<text x="' + (30 + (i * 67 + v * 40) % 340) + '" y="' + (40 + (i * 53 + v * 25) % 140) + '" font-size="' + (22 + (i % 3) * 10) + '" opacity=".18">' + e + '</text>';
+    var sh = '<rect width="400" height="200" fill="url(#g)"/><rect width="400" height="200" fill="url(#r)"/>' + s + '<circle cx="' + (200 + (v - 1) * 36) + '" cy="100" r="62" fill="#fff" opacity=".95"/><text x="' + (200 + (v - 1) * 36) + '" y="124" font-size="68" text-anchor="middle">' + e + '</text>';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c[0] + '"/><stop offset="1" stop-color="' + c[1] + '"/></linearGradient><radialGradient id="r" cx=".8" cy=".1" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' + sh + '</svg>';
+  }
+  function setEmoji(map) { EMO = map; }
+
   /** Mengembalikan data-URI SVG. kind: engine id | hero0|hero1|hero2 ; v: variasi 0-2 */
   function scene(kind, v) {
     v = v || 0;
-    var f = SCENES[kind] || SCENES.kuis, c = PAL[v % PAL.length];
+    if (!SCENES[kind]) return uri(generic(kind, v));
+    var f = SCENES[kind], c = PAL[v % PAL.length];
     var w = kind.indexOf('hero') === 0 ? 400 : 400, h = kind.indexOf('hero') === 0 ? 420 : 200;
     return uri(wrap(w, h, c, f(c, v)));
   }
@@ -141,5 +161,5 @@
     return [scene(t.engine, 0), scene(t.engine, 1), scene(t.engine, 2)];
   }
 
-  window.Art = { icon: icon, scene: scene, gambarTemplat: gambarTemplat };
+  window.Art = { icon: icon, scene: scene, gambarTemplat: gambarTemplat, setEmoji: setEmoji };
 })();

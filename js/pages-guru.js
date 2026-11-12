@@ -75,8 +75,8 @@
     if (!S.mode) S.mode = 'individu';
     if (!S.durasi) S.durasi = 15;
     if (!S.tingkat) S.tingkat = 'sedang';
-    var tpls = (App.templat.length ? App.templat : []).filter(function (t) { return t.status !== 'arsip'; });
-    if (!S.templateId && tpls[0]) { S.templateId = tpls[0].id; S.engine = tpls[0].engine; }
+    var tpls = Content.gabungKatalog(App.templat).filter(function (t) { return t.status !== 'arsip'; });
+    if (!S.templateId && tpls[0]) { S.templateId = tpls[0].id; S.engine = tpls[0].engine; S.dipilih = false; }
     var tplSel = tpls.filter(function (t) { return t.id === S.templateId; })[0]; if (tplSel) S.engine = tplSel.engine;
     function kelasInfo() { return Content.KELAS.filter(function (k) { return k.v === S.kelasV; })[0] || Content.KELAS[3]; }
     function meta() {
@@ -89,6 +89,7 @@
     function simpan() { App.draft(S); }
     var c;
     function render() {
+      tplSel = tpls.filter(function (t) { return t.id === S.templateId; })[0]; if (tplSel) S.engine = tplSel.engine;
       simpan(); var k = kelasInfo();
       var stp = function (n, t, s) { var st = S.step > n ? 'done' : S.step === n ? 'on' : ''; return '<div class="stp ' + st + '"><span>' + (S.step > n ? ic('check', 18) : n) + '</span><div><small>LANGKAH ' + n + (S.step > n ? ' • SELESAI' : S.step === n ? ' • AKTIF' : '') + '</small><b>' + t + '</b></div></div>'; };
       var head = '<div class="page-h"><div><h1>Buat Game Baru</h1><p>Tiga langkah singkat: identitas, karakteristik, lalu hasil.</p></div></div><div class="stepper">' + stp(1, 'Identitas & Kurikulum') + stp(2, 'Karakteristik & Jenis Game') + stp(3, 'Hasil & Publikasi') + '</div>';
@@ -112,25 +113,52 @@
         if (!S.mapel) S.mapel = mp.value; mp.value = S.mapel; auto();
         $('#f1', body).addEventListener('submit', function (e) { e.preventDefault(); auto(); if (!S.materi) { UI.toast('Topik wajib diisi.', 'err'); return; } S.step = 2; render(); });
       } else {
-        var t = tplSel || tpls[0] || { durasiMin: 5, durasiMaks: 60 }, dmin = t.durasiMin || 5, dmax = t.durasiMaks || 60;
-        S.durasi = Math.min(dmax, Math.max(dmin, S.durasi));
-        var cards = (tpls.length ? tpls : Object.keys(Content.ENGINE_INFO).map(function (e) { return { id: e, engine: e, nama: einfo(e).nama, deskripsi: einfo(e).ciri.join(' • '), fase: 'A,B,C,D' }; })).map(function (x) {
-          var f = k.fase, cocok = String(x.fase).split(',').indexOf(f) > -1;
-          return '<button type="button" class="eng card-fx shine' + (x.id === S.templateId ? ' on' : '') + '" data-t="' + esc(x.id) + '" style="--c:' + (x.warna || ENG_COLOR[x.engine]) + '"><span class="eng-ic">' + ic(x.ikon || einfo(x.engine).ikon, 22) + '</span><span class="pill' + (cocok ? '' : ' pill-mute') + '">' + (cocok ? 'Cocok • Fase ' + f : 'Fase ' + String(x.fase).replace(/,/g, '/')) + '</span><b>' + esc(x.nama) + '</b><small>' + esc(x.deskripsi) + '</small><span class="eng-ck">' + ic('check', 16) + '</span></button>';
-        }).join('');
-        body.innerHTML = '<div class="card pad"><h2 class="h-sec"><i class="v"></i> 2. Karakteristik & Mekanik Game</h2><label class="lbl">Judul permainan<input id="jd" class="inp" maxlength="140" value="' + esc(m.judul) + '"></label><div class="grid-3f"><div><div class="lbl">Mode bermain</div><div class="seg" id="seg-m"><button type="button" data-v="individu" class="' + (m.mode === 'individu' ? 'on' : '') + '"' + (S.engine === 'duel' ? ' disabled' : '') + '>' + ic('user', 16) + ' Individu</button><button type="button" data-v="kelompok" class="' + (m.mode === 'kelompok' ? 'on' : '') + '">' + ic('users', 16) + ' Kelompok / Tim</button></div>' + (S.engine === 'duel' ? '<small class="muted">Duel selalu berkelompok.</small>' : '') + '</div><div><div class="lbl">Durasi sesi <b class="pill" id="dv">' + S.durasi + ' Menit</b></div><input type="range" id="dr" min="' + dmin + '" max="' + dmax + '" step="1" value="' + S.durasi + '"><div class="range-l"><span>' + dmin + ' mnt</span><span>' + dmax + ' mnt</span></div></div><div><div class="lbl">Tingkat kesulitan</div><div class="seg" id="seg-t">' + [['mudah', 'Mudah'], ['sedang', 'Sedang'], ['bertingkat', 'Bertingkat']].map(function (x) { return '<button type="button" data-v="' + x[0] + '" class="' + (S.tingkat === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div></div></div>' +
-          '<h2 class="h-sec" style="margin-top:28px"><i class="y"></i> 3. Pilih Jenis Permainan <span class="muted right">' + (tpls.length || 6) + ' TEMPLAT SIAP PAKAI</span></h2><div class="engs">' + cards + '</div></div>' +
-          '<div class="sticky-bar"><button class="btn btn-outline" id="b1">' + ic('back', 18) + ' Kembali</button><button class="btn btn-soft" id="bp">' + ic('copy', 18) + ' Salin Prompt untuk AI</button><button class="btn btn-accent btn-lg glow shine" id="bg">' + ic('bolt', 18) + ' Buat Game Langsung ' + ic('arrow', 18) + '</button></div>';
-        UI.bind(body);
-        $('#jd', body).addEventListener('input', function (e) { S.judul = e.target.value; simpan(); });
-        $$('#seg-m button', body).forEach(function (b) { b.addEventListener('click', function () { S.mode = b.getAttribute('data-v'); $$('#seg-m button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); simpan(); }); });
-        $$('#seg-t button', body).forEach(function (b) { b.addEventListener('click', function () { S.tingkat = b.getAttribute('data-v'); $$('#seg-t button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); simpan(); }); });
-        $('#dr', body).addEventListener('input', function (e) { S.durasi = +e.target.value; $('#dv', body).textContent = S.durasi + ' Menit'; simpan(); });
-        $$('.eng', body).forEach(function (b) { b.addEventListener('click', function () { S.templateId = b.getAttribute('data-t'); var tt = tpls.filter(function (x) { return x.id === S.templateId; })[0]; S.engine = tt ? tt.engine : S.templateId; S.judul = ''; if (S.engine === 'duel') S.mode = 'kelompok'; render(); }); });
-        $('#b1', body).addEventListener('click', function () { S.step = 1; render(); });
-        $('#bp', body).addEventListener('click', function () { var mm = meta(); S.prompt = Content.buatPrompt(mm); S.promptSaved = false; simpan(); App.go('/guru/prompt'); });
-        $('#bg', body).addEventListener('click', langsung);
+        if (!S.dipilih) S.phase = 'pilih'; else if (!S.phase) S.phase = 'atur';
+        if (S.phase === 'pilih') pilihGame(body, k); else aturGame(body, k, m);
       }
+    }
+
+    function katLabel(kat) { return (Content.KATEGORI.filter(function (x) { return x[0] === kat; })[0] || [0, ''])[1]; }
+    function pilihGame(body, k) {
+      var q = (S.q || '').toLowerCase(), kat = S.kat || 'semua', hanyaCocok = !!S.cocok;
+      var daftar = tpls.filter(function (t) {
+        var info = einfo(t.engine), cocok = String(t.fase).split(',').indexOf(k.fase) > -1;
+        return (kat === 'semua' || info.kat === kat) && (!hanyaCocok || cocok) && (!q || (t.nama + ' ' + t.deskripsi).toLowerCase().indexOf(q) > -1);
+      });
+      body.innerHTML = '<div class="card pad"><h2 class="h-sec"><i class="v"></i> 2. Pilih Jenis Permainan <span class="muted right">' + tpls.length + ' TEMPLAT SIAP PAKAI</span></h2><p class="muted">Ketuk salah satu game. Anda masih bisa kembali dan menggantinya kapan saja.</p>' +
+        '<div class="pick-bar"><div class="search">' + ic('search', 18) + '<input id="sq" class="inp" placeholder="Cari game, mis. balon, silang, hitung…" value="' + esc(S.q || '') + '"></div><label class="chk"><input type="checkbox" id="sc"' + (hanyaCocok ? ' checked' : '') + '> Hanya yang cocok untuk Fase ' + k.fase + '</label></div>' +
+        '<div class="chips-f" id="sk">' + Content.KATEGORI.map(function (c) { return '<button class="chip-f' + (c[0] === kat ? ' on' : '') + '" data-kat="' + c[0] + '">' + c[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="engs">' + (daftar.map(function (x) {
+          var info = einfo(x.engine), cocok = String(x.fase).split(',').indexOf(k.fase) > -1;
+          return '<button type="button" class="eng card-fx shine' + (x.id === S.templateId && S.dipilih ? ' on' : '') + '" data-t="' + esc(x.id) + '" style="--c:' + (x.warna || info.warna) + '"><span class="eng-ic">' + ic(x.ikon || info.ikon, 22) + '</span><span class="pill' + (cocok ? '' : ' pill-mute') + '">' + (cocok ? 'Cocok • Fase ' + k.fase : 'Fase ' + String(x.fase).replace(/,/g, '/')) + '</span><b>' + esc(x.nama) + '</b><small>' + esc(x.deskripsi) + '</small><span class="eng-k">' + esc(katLabel(info.kat)) + '</span><span class="eng-ck">' + ic('check', 16) + '</span></button>';
+        }).join('') || '<div class="empty sm" style="grid-column:1/-1"><p>Tidak ada game yang cocok dengan pencarian. Ubah kata kunci atau kategori.</p></div>') + '</div></div>' +
+        '<div class="sticky-bar"><button class="btn btn-outline" id="b1">' + ic('back', 18) + ' Kembali ke Identitas</button><span class="muted">' + daftar.length + ' game ditampilkan</span></div>';
+      UI.bind(body);
+      $('#sq', body).addEventListener('input', UI.debounce(function (e) { S.q = e.target.value; simpan(); pilihGame(body, k); var i2 = $('#sq', body); i2.focus(); i2.setSelectionRange(i2.value.length, i2.value.length); }, 160));
+      $('#sc', body).addEventListener('change', function (e) { S.cocok = e.target.checked; simpan(); pilihGame(body, k); });
+      $$('#sk .chip-f', body).forEach(function (b) { b.addEventListener('click', function () { S.kat = b.getAttribute('data-kat'); simpan(); pilihGame(body, k); }); });
+      $$('.eng', body).forEach(function (b) { b.addEventListener('click', function () {
+        S.templateId = b.getAttribute('data-t'); var tt = tpls.filter(function (x) { return x.id === S.templateId; })[0]; S.engine = tt ? tt.engine : S.templateId; S.judul = ''; S.dipilih = true; S.phase = 'atur';
+        var inf = einfo(S.engine); if (inf.mode === 'kelompok') S.mode = 'kelompok'; else if (S.mode === 'kelompok' && inf.mode === 'individu') S.mode = 'individu';
+        render(); window.scrollTo(0, 0); }); });
+      $('#b1', body).addEventListener('click', function () { S.step = 1; render(); });
+    }
+    function aturGame(body, k, m) {
+      var t = tpls.filter(function (x) { return x.id === S.templateId; })[0] || tpls[0] || { durasiMin: 5, durasiMaks: 60 }, info = einfo(t.engine || S.engine), dmin = t.durasiMin || 5, dmax = t.durasiMaks || 60, cocok = String(t.fase).split(',').indexOf(k.fase) > -1;
+      S.durasi = Math.min(dmax, Math.max(dmin, S.durasi));
+      body.innerHTML = '<div class="sel-g card" style="--c:' + (t.warna || info.warna) + '"><div class="sel-media" id="sm">' + Art.gambarTemplat(t).map(function (u) { return '<img class="slide" src="' + esc(u) + '" alt="">'; }).join('') + '<div class="dots"></div></div><div class="sel-body"><button class="btn btn-soft btn-sm" id="ganti">' + ic('back', 16) + ' Ganti Game</button><span class="eng-k">' + esc(katLabel(info.kat)) + '</span><h2>' + esc(t.nama) + '</h2><p class="muted">' + esc(t.deskripsi) + '</p><ul class="ticks">' + info.ciri.map(function (x) { return '<li>' + ic('check', 14) + esc(x) + '</li>'; }).join('') + '</ul><div class="chips"><span class="pill' + (cocok ? '' : ' pill-mute') + '">' + (cocok ? 'Cocok untuk Fase ' + k.fase : 'Dirancang untuk Fase ' + String(t.fase).replace(/,/g, '/')) + '</span><span class="pill">' + dmin + '–' + dmax + ' menit</span></div></div></div>' +
+        '<div class="card pad"><h2 class="h-sec"><i class="v"></i> Pengaturan Permainan</h2><label class="lbl">Judul permainan<input id="jd" class="inp" maxlength="140" value="' + esc(m.judul) + '"></label><div class="grid-3f"><div><div class="lbl">Mode bermain</div><div class="seg" id="seg-m"><button type="button" data-v="individu" class="' + (m.mode === 'individu' ? 'on' : '') + '"' + (S.engine === 'duel' ? ' disabled' : '') + '>' + ic('user', 16) + ' Individu</button><button type="button" data-v="kelompok" class="' + (m.mode === 'kelompok' ? 'on' : '') + '">' + ic('users', 16) + ' Kelompok</button></div>' + (S.engine === 'duel' ? '<small class="muted">Duel selalu berkelompok.</small>' : '') + '</div><div><div class="lbl">Durasi sesi <b class="pill" id="dv">' + S.durasi + ' Menit</b></div><input type="range" id="dr" min="' + dmin + '" max="' + dmax + '" step="1" value="' + S.durasi + '"><div class="range-l"><span>' + dmin + ' mnt</span><span>' + dmax + ' mnt</span></div></div><div><div class="lbl">Tingkat kesulitan</div><div class="seg" id="seg-t">' + [['mudah', 'Mudah'], ['sedang', 'Sedang'], ['bertingkat', 'Bertingkat']].map(function (x) { return '<button type="button" data-v="' + x[0] + '" class="' + (S.tingkat === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div></div></div></div>' +
+        '<div class="sticky-bar"><button class="btn btn-outline" id="b0">' + ic('back', 18) + ' Pilih Game Lain</button><button class="btn btn-ghost" id="b1">Identitas</button><button class="btn btn-soft" id="bp">' + ic('copy', 18) + ' Salin Prompt untuk AI</button><button class="btn btn-accent btn-lg glow shine" id="bg">' + ic('bolt', 18) + ' Buat Game Langsung ' + ic('arrow', 18) + '</button></div>';
+      UI.bind(body); UI.rotator($('#sm', body), { slideSel: '.slide', dots: '.dots', ms: 3000 });
+      function kembaliKeDaftar() { S.phase = 'pilih'; simpan(); render(); window.scrollTo(0, 0); }
+      $('#ganti', body).addEventListener('click', kembaliKeDaftar); $('#b0', body).addEventListener('click', kembaliKeDaftar);
+      $('#b1', body).addEventListener('click', function () { S.step = 1; render(); });
+      $('#jd', body).addEventListener('input', function (e) { S.judul = e.target.value; simpan(); });
+      $$('#seg-m button', body).forEach(function (b) { b.addEventListener('click', function () { S.mode = b.getAttribute('data-v'); $$('#seg-m button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); simpan(); }); });
+      $$('#seg-t button', body).forEach(function (b) { b.addEventListener('click', function () { S.tingkat = b.getAttribute('data-v'); $$('#seg-t button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); simpan(); }); });
+      $('#dr', body).addEventListener('input', function (e) { S.durasi = +e.target.value; $('#dv', body).textContent = S.durasi + ' Menit'; simpan(); });
+      $('#bp', body).addEventListener('click', function () { var mm = meta(); S.prompt = Content.buatPrompt(mm); S.promptSaved = false; simpan(); App.go('/guru/prompt'); });
+      $('#bg', body).addEventListener('click', langsung);
     }
     function langsung() {
       var mm = meta(), prompt = Content.buatPrompt(mm), m = UI.modal({ title: 'Membuat permainan…', body: App.loading('AI menyusun ' + einfo(S.engine).nama + '. Ini bisa memakan waktu 10–30 detik.') });
@@ -208,6 +236,11 @@
     if (k.questions && k.questions[0]) { var q = k.questions[0]; return head + '<div class="pv-q"><span class="pill">Pertanyaan 1 / ' + k.questions.length + '</span><h4>' + esc(q.q) + '</h4></div><div class="pv-opts">' + q.options.map(function (o, i) { return '<div class="pv-o' + (i === q.answer && !g.kunciTersembunyi ? ' hit' : '') + '"><b>' + 'ABCDE'[i] + '</b>' + esc(o) + '</div>'; }).join('') + '</div>'; }
     if (k.pairs) return head + '<div class="pv-pairs">' + k.pairs.slice(0, 6).map(function (x) { return '<div><span>' + esc(x.a) + '</span><i>↔</i><span>' + esc(x.b) + '</span></div>'; }).join('') + '</div>';
     if (k.sequences) return head + '<div class="pv-q"><h4>' + esc(k.sequences[0].title) + '</h4></div><ol class="pv-seq">' + k.sequences[0].steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>';
+    if (k.statements) return head + '<div class="pv-q"><span class="pill">Benar atau salah?</span><h4>' + esc(k.statements[0].text) + '</h4></div><div class="pv-opts"><div class="pv-o hit"><b>✔</b>BENAR</div><div class="pv-o"><b>✘</b>SALAH</div></div>';
+    if (k.items) return head + '<div class="pv-q"><h4>' + esc(k.items[0].q) + '</h4></div><div class="pv-o" style="justify-content:center;color:var(--muted)">Siswa mengetik jawabannya…</div>';
+    if (k.groups) return head + '<div class="pv-pairs">' + k.groups.map(function (gr) { return '<div><span><b>' + esc(gr.name) + '</b></span><i>←</i><span>' + gr.items.slice(0, 3).map(esc).join(', ') + '</span></div>'; }).join('') + '</div>';
+    if (k.problems) return head + '<div class="pv-q"><h4>' + esc(k.problems[0].q) + '</h4></div><div class="pv-o" style="justify-content:center">Papan angka 0–9 di layar siswa</div>';
+    if (k.cards) return head + '<div class="pv-pairs">' + k.cards.slice(0, 4).map(function (x) { return '<div><span>' + esc(x.front) + '</span><i>⇄</i><span>' + esc(x.back).slice(0, 40) + '</span></div>'; }).join('') + '</div>';
     if (k.words) return head + '<ul class="pv-seq">' + k.words.slice(0, 5).map(function (w) { return '<li><b>' + w.word.length + ' huruf</b> — ' + esc(w.clue) + '</li>'; }).join('') + '</ul>';
     return head;
   }
@@ -223,7 +256,7 @@
       c.innerHTML = '<div class="crumb"><a href="#/guru/buat">Buat Permainan Baru</a> › <span>Langkah 3: Game Berhasil Dibuat & Siap Dimainkan!</span><span class="live-pill"><i></i> ' + (Api.LIVE ? 'SINKRONISASI CLOUD AKTIF' : 'MODE DEMO') + '</span></div>' +
         '<div class="success-b" data-reveal><div class="sb-ic">' + ic('sparkles', 34) + '</div><div><h2>🎉 Permainan Interaktif Berhasil Diterbitkan!</h2><p>Game kini aktif dan siap dimainkan siswa di kelas maupun di rumah.</p></div><span class="sb-id">' + ic('bolt', 16) + ' Kode: ' + esc(g.kode) + '</span></div>' +
         '<div class="grid-main2"><div><div class="card pad"><div class="card-h"><h2 class="h-sm">' + ic('eye', 20) + ' Pratinjau Tampilan Siswa</h2><span class="st st-on">● ' + (g.status === 'aktif' ? 'AKTIF (Siap Menerima Siswa)' : 'NONAKTIF') + '</span></div><div class="device"><div class="pv card-fx">' + previewHtml(g) + '</div></div>' +
-        '<div class="chips mt"><span class="chip">' + n + ' ' + (g.engine === 'kartu' ? 'Pasang' : g.engine === 'balok' ? 'Urutan' : g.engine === 'tts' ? 'Kata' : 'Butir Soal') + '</span><span class="chip">' + (g.asesmen === 'sumatif' ? 'Sumatif' : 'Formatif') + '</span><span class="chip">' + esc(info.nama) + '</span><span class="chip">' + esc(g.jenjang) + ' Kelas ' + esc(g.kelas) + ' (Fase ' + esc(g.fase) + ')</span></div>' +
+        '<div class="chips mt"><span class="chip">' + n + ' ' + (info.sat || 'butir soal').replace(/^./, function (c) { return c.toUpperCase(); }) + '</span><span class="chip">' + (g.asesmen === 'sumatif' ? 'Sumatif' : 'Formatif') + '</span><span class="chip">' + esc(info.nama) + '</span><span class="chip">' + esc(g.jenjang) + ' Kelas ' + esc(g.kelas) + ' (Fase ' + esc(g.fase) + ')</span></div>' +
         '<div class="form-act"><a class="btn btn-primary btn-lg glow shine" target="_blank" rel="noopener" href="#/main/' + encodeURIComponent(g.kode) + '?uji=1">' + ic('play', 18) + ' Uji Coba Main Sebagai Siswa</a><button class="btn btn-outline" id="ed">' + ic('edit', 18) + ' Edit / Review Butir Soal</button></div></div></div>' +
         '<aside><section class="card pad share"><div class="card-h"><div><small class="lbl-s">AKSES LANGSUNG KELAS</small><h3 class="h-sm">Bagikan ke Murid</h3></div></div><div class="pin-box card-fx shine"><small>KODE AKSES GAME (PIN KELAS)</small><div class="pin"><b>' + esc(g.kode) + '</b><button class="btn btn-accent btn-sm" id="cpin" title="Salin kode">' + ic('copy', 18) + '</button></div><p>Siswa cukup membuka <b>' + esc(location.host + location.pathname.replace(/\/$/, '')) + '</b> lalu memasukkan kode ini.</p></div>' +
         '<small class="lbl-s">TAUTAN CEPAT PERMAINAN</small><div class="linkrow"><input class="inp mono" readonly value="' + esc(link) + '" id="lk"><button class="btn btn-primary btn-sm" id="clk">Salin</button></div>' +
@@ -301,6 +334,13 @@
         if (r.success) {
           gameCache[row.idPermainan] = r.data; var g = r.data, qs = g.konten.questions, j = row.detail && row.detail.j;
           if (qs && j && j.length) body += '<div class="ans-list">' + j.map(function (pr) { var q = qs[pr[0]]; if (!q) return ''; var bn = pr[1] === q.answer; return '<div class="ans ' + (bn ? 'ok' : 'bad') + '"><b>' + (pr[0] + 1) + '. ' + esc(q.q) + '</b><span>Jawaban siswa: ' + (pr[1] >= 0 ? esc(q.options[pr[1]] || '-') : '<em>tidak menjawab</em>') + '</span>' + (bn ? '' : '<span>Kunci: ' + esc(q.options[q.answer]) + '</span>') + '</div>'; }).join('') + '</div>';
+          else if (j && j.length && (g.konten.statements || g.konten.items || g.konten.problems)) {
+            var LL = g.konten.statements || g.konten.items || g.konten.problems;
+            body += '<div class="ans-list">' + j.map(function (pr) { var it = LL[pr[0]]; if (!it) return ''; var bn = Content.sama(g.engine, it, pr[1]);
+              var tampil = g.konten.statements ? (Number(pr[1]) === 1 ? 'Benar' : 'Salah') : (pr[1] === '' || pr[1] === undefined ? 'tidak menjawab' : pr[1]);
+              var kunci = g.konten.statements ? (it.benar ? 'Benar' : 'Salah') : it.answer;
+              return '<div class="ans ' + (bn ? 'ok' : 'bad') + '"><b>' + (pr[0] + 1) + '. ' + esc(it.text || it.q) + '</b><span>Jawaban siswa: ' + esc(tampil) + '</span>' + (bn ? '' : '<span>Kunci: ' + esc(kunci) + '</span>') + '</div>'; }).join('') + '</div>';
+          }
           else body += '<div class="note">Jenis permainan ini mencatat skor keseluruhan, bukan jawaban per butir.</div>';
         } else body += '<div class="note note-warn">Permainan sumber tidak tersedia (mungkin sudah dihapus).</div>';
         UI.modal({ title: 'Jawaban Siswa', wide: true, body: body, actions: [{ label: 'Tutup', cls: 'btn-outline', onClick: function (x) { x(); } }] });

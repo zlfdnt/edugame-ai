@@ -25,7 +25,8 @@
     err: function (msg, retry) { return '<div class="empty"><div class="empty-ic">' + ic('bell', 32) + '</div><h3>Terjadi kendala</h3><p>' + esc(msg) + '</p>' + (retry ? '<button class="btn btn-primary" data-retry>Coba lagi</button>' : '') + '</div>'; },
     applyBoot: function (d) {
       if (!d) return;
-      App.boot = d; App.settings = d.pengaturan || {}; App.templat = d.templat || []; App.stats = d.stats || App.stats;
+      App.boot = d; App.settings = d.pengaturan || {}; App.templat = Content.gabungKatalog(d.templat || []); App.stats = d.stats || App.stats;
+      if (d.googleClientId) { App.googleClientId = d.googleClientId; Api.lsSet('edugame_gcid', d.googleClientId); }
       var wa = $('#wa-float'), l = App.waLink();
       if (wa) { wa.hidden = !l; if (l) wa.href = l; }
     },
@@ -96,6 +97,7 @@
   function init() {
     root = $('#app');
     App.applyBoot({ pengaturan: {}, templat: [], stats: {} });
+    App.googleClientId = (window.APP_CONFIG && APP_CONFIG.GOOGLE_CLIENT_ID) || Api.lsGet('edugame_gcid', '');
     var cached = Api.bootCached(); if (cached) App.applyBoot(cached);
     Api.warmUp();
     // rute
@@ -120,9 +122,10 @@
     document.addEventListener('click', function (e) { var r = e.target.closest && e.target.closest('[data-retry]'); if (r) route(); });
     UI.bind(document);
     // konten halaman dirender asinkron: ikat ulang efek (reveal, kilau, count-up) pada node baru
-    new MutationObserver(UI.debounce(function () { UI.bind(root); }, 90)).observe(root, { childList: true, subtree: true });
+    new MutationObserver(UI.debounce(function () { UI.bind(root); document.body.classList.toggle('has-bar', !!$('.sticky-bar')); }, 90)).observe(root, { childList: true, subtree: true });
     Api.flushPending();
     route();
+    if (App.googleClientId && Api.LIVE && !/^#\/main/.test(location.hash)) { (window.requestIdleCallback || function (f) { setTimeout(f, 1200); })(function () { UI.loadScript('https://accounts.google.com/gsi/client').catch(function () { /* dicoba ulang di halaman masuk */ }); }); }
     Api.boot().then(function (r) { if (r && r.success) { var was = JSON.stringify(App.boot); App.applyBoot(r.data); if (JSON.stringify(App.boot) !== was && App.onBoot) App.onBoot(); } });
   }
 

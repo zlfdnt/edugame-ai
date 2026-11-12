@@ -5,8 +5,8 @@
 (function () {
   'use strict';
   var $ = UI.$, $$ = UI.$$, ic = UI.ic, esc = UI.esc, P = App.Pages;
-  var ENG = ['kuis', 'tts', 'kartu', 'duel', 'balok', 'labirin'];
-  var IKON = ['timer', 'grid', 'cards', 'swords', 'blocks', 'compass', 'star', 'bolt', 'bulb', 'flag'];
+  var ENG = Content.CATALOG.map(function (c) { return c.engine; });
+  var IKON = ['timer', 'grid', 'cards', 'swords', 'blocks', 'compass', 'star', 'bolt', 'bulb', 'flag', 'checkc', 'link', 'edit', 'search', 'file', 'layers', 'balloon', 'hammer', 'refresh', 'gift', 'plane', 'sprout', 'rocket', 'dice', 'calc', 'heart', 'trophy'];
   function einfo(e) { return Content.ENGINE_INFO[e] || Content.ENGINE_INFO.kuis; }
   function head(t, sub, act) { return '<div class="page-h"><div><span class="badge">ADMIN</span><h1>' + t + '</h1><p>' + sub + '</p></div><div class="page-act">' + (act || '') + '</div></div>'; }
   function guard(ok) { if (!App.requireLogin('admin')) return null; return true; }
@@ -20,11 +20,11 @@
         if (!ok()) return;
         if (!r.success) { c.innerHTML = App.err(r.message, true); return; }
         var d = r.data, T = d.templat, top = Object.keys(d.pakai).sort(function (a, b) { return d.pakai[b] - d.pakai[a]; })[0];
-        c.innerHTML = head('Kelola Templat & Jenis Game', 'Atur mekanik, jenjang fase, durasi, dan gambar slideshow katalog. Setiap templat memakai salah satu dari 6 mesin permainan.', '<button class="btn btn-primary glow shine" id="nt">' + ic('plusc', 18) + ' Tambah Templat</button>') +
+        c.innerHTML = head('Kelola Templat & Jenis Game', 'Atur mekanik, jenjang fase, durasi, dan gambar slideshow katalog. Setiap templat memakai salah satu dari 24 mesin permainan.', '<button class="btn btn-primary glow shine" id="nt">' + ic('plusc', 18) + ' Tambah Templat</button>') +
           '<div class="metrics"><div class="metric card-fx"><span class="m-l">TOTAL TEMPLAT AKTIF</span><b class="m-v">' + T.filter(function (t) { return t.status === 'aktif'; }).length + '<small> / ' + T.length + '</small></b></div><div class="metric card-fx"><span class="m-l">GURU TERDAFTAR</span><b class="m-v">' + d.guru + '</b><span class="m-f">' + d.guruAktif + ' aktif</span></div><div class="metric card-fx"><span class="m-l">PERMAINAN DIBUAT</span><b class="m-v">' + d.game + '</b><span class="m-f">Terpopuler: ' + (top ? esc(einfo(top).nama) : '—') + '</span></div><div class="metric card-fx"><span class="m-l">HASIL SISWA</span><b class="m-v">' + UI.fmtNum(d.siswa) + '</b><span class="m-f">Rata-rata skor ' + String(d.rataSkor).replace('.', ',') + '</span></div></div>' +
           '<section class="card"><div class="tbl-w"><table class="tbl"><thead><tr><th>Nama Templat & Mekanik</th><th>Mesin</th><th>Fase</th><th>Mode & Durasi</th><th>Dipakai</th><th>Status</th><th class="r">Aksi</th></tr></thead><tbody>' +
           T.map(function (t) { return '<tr><td><div class="gcell"><span class="gi" style="--c:' + esc(t.warna) + '">' + ic(t.ikon, 20) + '</span><div><b>' + esc(t.nama) + '</b><small><code>' + esc(t.id) + '</code> — ' + esc(t.deskripsi).slice(0, 70) + '</small></div></div></td><td><code>' + esc(t.engine) + '</code></td><td>' + esc(String(t.fase).replace(/,/g, ' / ')) + '</td><td>' + esc(t.mode) + '<small>' + t.durasiMin + '–' + t.durasiMaks + ' menit</small></td><td><b>' + (d.pakai[t.engine] || 0) + '</b> game <small>(mesin)</small></td><td>' + (t.status === 'aktif' ? '<span class="st st-on">● Aktif</span>' : '<span class="st st-off">● Arsip</span>') + '</td><td class="r act"><button class="icon-btn" data-e="' + esc(t.id) + '" title="Ubah">' + ic('edit', 18) + '</button>' + (t.status === 'aktif' ? '<button class="icon-btn danger" data-a="' + esc(t.id) + '" title="Arsipkan">' + ic('trash', 18) + '</button>' : '') + '</td></tr>'; }).join('') + '</tbody></table></div></section>' +
-          '<div class="note">' + ic('bulb', 18) + '<div><b>Catatan:</b> penambahan templat baru memetakan nama/deskripsi/gambar ke salah satu mesin yang sudah ada. Mekanik permainan yang benar-benar baru memerlukan penambahan kode mesin di <code>js/games.js</code>.</div></div>';
+          '<div class="note">' + ic('bulb', 18) + '<div><b>Catatan:</b> penambahan templat baru memetakan nama/deskripsi/gambar ke salah satu dari 24 mesin yang sudah ada. Mekanik permainan yang benar-benar baru memerlukan penambahan kode mesin di <code>js/games*.js</code>.</div></div>';
         $('#nt', c).addEventListener('click', function () { form(null); });
         $$('[data-e]', c).forEach(function (b) { b.addEventListener('click', function () { form(T.filter(function (t) { return t.id === b.getAttribute('data-e'); })[0]); }); });
         $$('[data-a]', c).forEach(function (b) { b.addEventListener('click', function () { UI.confirm('Arsipkan templat ini? Templat tidak tampil di katalog, tetapi permainan yang sudah ada tetap berjalan.', 'Arsipkan', true).then(function (y) { if (y) Api.call('tpl.hapus', { id: b.getAttribute('data-a') }).then(function (r2) { UI.toast(r2.message, r2.success ? 'ok' : 'err'); Api.boot(); load(); }); }); }); });
@@ -75,9 +75,17 @@
         '<section class="card pad"><h2 class="h-sm">' + ic('lock', 20) + ' Rahasia & integrasi</h2><p class="muted">Nilai tidak ditampilkan ulang. Kosongkan lalu klik Hapus untuk mencabut.</p>' +
         rahasia('GOOGLE_CLIENT_ID', 'Google OAuth Client ID', 'xxxx.apps.googleusercontent.com', 'Untuk tombol "Masuk dengan Google". Buat di Google Cloud Console; tambahkan alamat situs ini ke Authorized JavaScript origins.') +
         rahasia('GEMINI_API_KEY', 'Gemini API Key', 'AIza…', 'Mengaktifkan tombol "Buat Game Langsung". Dipanggil dari server (UrlFetchApp), tidak dari browser.') +
-        rahasia('GEMINI_MODEL', 'Model Gemini (opsional)', 'gemini-2.0-flash', 'Ganti bila model berubah. Kosong = bawaan.') + '</section>';
+        rahasia('GEMINI_MODEL', 'Model Gemini (opsional)', 'gemini-3.5-flash', 'Kosongkan agar aplikasi memilih model Gemini terbaru yang tersedia secara otomatis (disarankan).') +
+        '<div class="sec-row"><div><b>Tes koneksi AI</b><small>Memeriksa kunci, mendaftar model yang tersedia, dan mencoba satu permintaan kecil.</small></div><div class="sec-in"><button class="btn btn-soft" id="tes">' + ic('bolt', 18) + ' Tes koneksi AI</button></div></div><div id="tes-h"></div></section>';
       $('#pf', c).addEventListener('submit', function (e) { e.preventDefault(); var v = {}; $$('[data-p]', c).forEach(function (i) { v[i.getAttribute('data-p')] = i.value; }); Api.call('pengaturan.simpan', { nilai: v }).then(function (r) { UI.toast(r.message, r.success ? 'ok' : 'err'); Api.boot(); }); });
       $$('[data-sv]', c).forEach(function (b) { b.addEventListener('click', function () { var k = b.getAttribute('data-sv'), i = $('[data-k="' + k + '"]', c); Api.call('rahasia.simpan', { kunci: k, nilai: i.value }).then(function (r) { i.value = ''; UI.toast(r.message, r.success ? 'ok' : 'err', 5000); if (r.success) App.route(); }); }); });
+      var tb = $('#tes', c); if (tb) tb.addEventListener('click', function () {
+        var h = $('#tes-h', c); h.innerHTML = App.loading('Menguji koneksi ke Gemini…'); tb.disabled = true;
+        Api.call('ai.tes').then(function (r) { tb.disabled = false;
+          if (!r.success) { h.innerHTML = '<div class="note note-err">' + esc(r.message) + '</div>'; return; }
+          var d = r.data; h.innerHTML = '<div class="note ' + (d.berhasil ? '' : 'note-err') + '">' + ic(d.berhasil ? 'checkc' : 'x', 18) + '<div><b>' + (d.berhasil ? 'Berhasil — model yang dipakai: ' + esc(d.model) : 'Gagal (kode ' + d.kode + ')') + '</b>' + (d.pesan ? '<br>' + esc(d.pesan) : '') + (d.daftar.length ? '<br><small>Model tersedia untuk kunci Anda: ' + d.daftar.map(esc).join(', ') + '</small>' : '<br><small>Daftar model tidak dapat dibaca — periksa kunci API.</small>') + '</div></div>';
+        });
+      });
       $$('[data-rm]', c).forEach(function (b) { b.addEventListener('click', function () { UI.confirm('Hapus nilai ini dari Script Properties?', 'Hapus', true).then(function (y) { if (y) Api.call('rahasia.simpan', { kunci: b.getAttribute('data-rm'), nilai: '__HAPUS__' }).then(function (r) { UI.toast(r.message, r.success ? 'ok' : 'err'); App.route(); }); }); }); });
     });
   };

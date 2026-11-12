@@ -1,4 +1,15 @@
-# Panduan Instalasi — EduGame AI
+# Panduan Instalasi — EduGame AI (v1.1)
+
+> ## Sudah memasang v1.0? Lakukan pembaruan ini (±10 menit)
+> 1. **Backend:** buka proyek Apps Script → ganti seluruh isi berkas `Kode` dengan `Kode.gs` yang baru → **Save**.
+> 2. Pilih fungsi **`setupAppEnvironment`** → **Run**. Ini menambahkan 18 templat baru (total 24) tanpa menghapus data atau rahasia Anda.
+> 3. *(disarankan)* Pilih fungsi **`nyalakanKeepWarm`** → **Run**. Ini menjaga server tetap hangat sehingga login tidak lambat.
+> 4. **Deploy → Manage deployments → ikon pensil → Version: New version → Deploy.** URL `/exec` tidak berubah.
+> 5. **Frontend:** ekstrak `edugame-frontend.zip`, **salin `js/config.js` lama Anda** (yang sudah berisi `GAS_URL`) menimpa `js/config.js` baru, lalu dari folder itu jalankan `git add .`, `git commit -m "v1.1"`, `git push`.
+> 6. Buka situs, tekan **Ctrl+F5** (muat ulang penuh), lalu buka **Admin → Pengaturan & Rahasia → Tes koneksi AI**.
+>
+> **Yang baru di v1.1:** 24 jenis game, pemilih game dengan pencarian + tombol *Ganti Game*, login Google lebih cepat, pembuatan AI memilih model Gemini otomatis, dan beberapa perbaikan tampilan.
+
 
 Aplikasi ini terdiri dari **dua bagian** yang dipasang terpisah:
 
@@ -113,8 +124,9 @@ git push
 ### D2. Tombol "Buat Game Langsung" (AI otomatis, opsional)
 1. Dapatkan API key Gemini di <https://aistudio.google.com/apikey>.
 2. Tempel di **Admin → Pengaturan → Gemini API Key → Simpan**. Kunci disimpan di *Script Properties* dan **tidak pernah** dikirim ke browser.
-3. Jika nama model berubah, isi **Model Gemini** (bawaan `gemini-2.0-flash`).
-4. Batas bawaan 30 pembuatan/guru/hari (ubah lewat Script Property `AI_BATAS_HARIAN`).
+3. **Biarkan kotak Model Gemini kosong.** Mulai v1.1, aplikasi mencari sendiri model Gemini *flash* terbaru yang tersedia untuk kunci Anda. Isi hanya jika Anda ingin memaksa model tertentu.
+4. Klik **Tes koneksi AI** di halaman yang sama. Hasilnya menampilkan model yang dipakai, atau pesan galat asli dari Google bila gagal.
+5. Batas bawaan 30 pembuatan/guru/hari (ubah lewat Script Property `AI_BATAS_HARIAN`).
 
 Tanpa kunci ini, guru tetap bisa memakai **Salin Prompt → tempel ke AI favorit → impor hasilnya**.
 
@@ -125,6 +137,11 @@ Isi nomor di **Admin → Pengaturan → Nomor WhatsApp** (format `6281234567890`
 Secara bawaan kartu memakai ilustrasi bawaan (3 gambar bergantian otomatis). Untuk foto sendiri: **Admin → Ubah templat → Gambar slideshow** (URL `https://…`, satu per baris, maksimal 6).
 
 ---
+
+### D5. Login Google tetap terasa lambat?
+- Jalankan `nyalakanKeepWarm` (lihat kotak pembaruan di atas). Tanpa itu, permintaan pertama setelah server lama tidak dipakai bisa memerlukan beberapa detik (cold start Apps Script); ini perilaku bawaan Google.
+- Mulai v1.1, guru yang sudah terdaftar masuk lewat jalur cepat (tanpa membaca spreadsheet), dan tombol Google muncul tanpa menunggu server.
+- Pastikan guru memilih akun di jendela Google satu kali saja; tombol dinonaktifkan sementara saat verifikasi berlangsung.
 
 ## E. Daftar Uji Cepat
 - [ ] Beranda terbuka, slideshow hero bergerak, kartu templat bergantian gambar.
@@ -151,7 +168,9 @@ Setelah mengedit `Kode.gs`: **Deploy → Manage deployments → ikon pensil → 
 | Lupa kata sandi darurat | — | Jalankan `resetAksesDarurat` di editor Apps Script |
 
 ## H. Batasan yang Perlu Diketahui
-- Enam mesin permainan tersedia: kuis, teka-teki silang, kartu memori, duel tim, susun balok, labirin. Templat tambahan di Admin memetakan nama/gambar ke salah satu mesin ini.
-- Pada asesmen **sumatif**, kunci jawaban disembunyikan dari siswa hanya untuk kuis, duel, dan labirin (skor dihitung ulang server). Untuk jenis lain, penilaian bersifat formatif.
+- **24 mesin permainan** tersedia: kuis kilat, teka-teki silang, kartu memori, duel tim, susun balok, labirin, benar/salah, jodohkan, anagram, tebak kata (gantung), cari kata, isi titik-titik, kelompokkan, pecahkan balon, pukul tikus, roda putar, kotak misteri, pesawat, katak loncat, roket, balap mobil, ular tangga, hitung cepat, dan kartu kilat. Templat tambahan di Admin memetakan nama/gambar ke salah satu mesin ini.
+- Seluruh mesin dirender oleh aplikasi dari **konten JSON** yang dihasilkan AI (tampilan, animasi, suara, dan poin dibuat aplikasi). AI tidak menulis kode game.
+- Pada asesmen **sumatif**, kunci jawaban disembunyikan dari siswa dan skor dihitung ulang server untuk semua game berbasis soal, benar/salah, isian, dan hitung. Game lain (memori, kata, urutan, kelompok, dll.) menilai di sisi siswa sehingga lebih cocok untuk formatif. **Duel** juga dinilai di sisi layar bersama.
+- **Kartu Kilat** adalah penilaian mandiri siswa (jujur-jujuran), bukan skor objektif.
 - Siswa tanpa login: nama bisa diisi siapa pun. Gunakan sebagai alat belajar, bukan bukti identitas.
 - Kuota Apps Script harian berlaku (siswa banyak serentak ditangani lewat antrean kunci dan pengiriman ulang otomatis di sisi siswa).

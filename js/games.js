@@ -53,7 +53,7 @@
       var q = Q[i], pct = Math.round(i / n * 100);
       root.innerHTML = '<div class="arena">' + top(g, chip('timer', '<span id="kt">' + left + '</span> dtk', 'ar-time') + chip('star', '<span id="kp">' + pts + '</span> Poin', 'ar-pts')) +
         '<div class="ar-prog"><i style="width:' + pct + '%"></i></div><div class="ar-sub"><span class="pill">Soal ' + (i + 1) + ' / ' + n + '</span>' + (streak >= 2 ? '<span class="pill pill-fire">' + ic('fire', 14) + ' ' + streak + 'x combo</span>' : '') + '</div>' +
-        '<div class="q-card card-fx shine"><h2 class="q-text">' + esc(q.q) + '</h2></div><div class="opts" role="listbox">' +
+        '<div class="q-card card-fx shine">' + (q.emoji ? '<span class="emo big">' + esc(q.emoji) + '</span>' : '') + '<h2 class="q-text">' + esc(q.q) + '</h2></div><div class="opts" role="listbox">' +
         q.options.map(function (o, k) { return '<button class="opt card-fx" role="option" data-k="' + k + '"><span class="opt-l">' + LBL[k] + '</span><span class="opt-t">' + esc(o) + '</span><span class="opt-s"></span></button>'; }).join('') + '</div>' +
         '<div class="ar-foot"><div id="fb" class="fb"></div><button class="btn btn-primary btn-lg btn-block glow" id="go" disabled>Kirim & Lanjut ' + ic('arrow', 20) + '</button></div></div>';
       UI.bind(root); wire(); sel = -1; kunci = false; left = per; startTimer();
@@ -402,15 +402,15 @@
 
   var ENGINES = { kuis: kuis, duel: duel, kartu: kartu, balok: balok, tts: tts, labirin: labirin };
   function start(root, game, player, onFinish, onQuit) {
-    var fn = ENGINES[game.engine];
+    var fn = ENGINES[game.engine], dead = false;
     if (!fn) { root.innerHTML = '<p class="muted">Jenis permainan belum didukung.</p>'; return { destroy: function () {} }; }
-    var ctl = fn(root, game, player, onFinish);
+    var ctl = fn(root, game, player, function (r) { if (!dead) onFinish(r); });     // hasil terlambat dari permainan yang sudah ditinggalkan diabaikan
     function quit(e) {
       var b = e.target.closest && e.target.closest('[data-quit]'); if (!b) return;
-      UI.confirm('Keluar dari permainan? Progres tidak akan tersimpan.', 'Keluar', true).then(function (y) { if (y) { ctl.destroy(); if (onQuit) onQuit(); } });
+      UI.confirm('Keluar dari permainan? Progres tidak akan tersimpan.', 'Keluar', true).then(function (y) { if (y) { dead = true; ctl.destroy(); if (onQuit) onQuit(); } });
     }
     root.addEventListener('click', quit);
-    return { destroy: function () { ctl.destroy(); root.removeEventListener('click', quit); } };
+    return { destroy: function () { dead = true; try { ctl.destroy(); } catch (e) { /* abaikan */ } root.removeEventListener('click', quit); } };
   }
-  window.Games = { start: start, sfx: sfx, susunTTS: susunTTS };
+  window.Games = { start: start, sfx: sfx, susunTTS: susunTTS, register: function (n, f) { ENGINES[n] = f; }, H: { top: top, chip: chip, finish: finish, clamp: clamp, LBL: LBL } };
 })();

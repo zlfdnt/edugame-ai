@@ -59,17 +59,23 @@
     });
   }
 
+  function liveRunRetry(action, data, useGet) {
+    return liveRun(action, data, useGet).then(function (r) {
+      if (r && r.code === 'NET') return new Promise(function (res) { setTimeout(res, 900); }).then(function () { return liveRun(action, data, useGet); });
+      return r;
+    });
+  }
   function call(action, data, opts) {
     opts = opts || {};
     data = data || {};
     if (!LIVE) return Promise.resolve(Demo.handle(action, data, Sesi.get())).then(function (r) { return delay(r, action); });
     var isRead = READ_PUB.test(action) || READ_ALL.test(action);
-    if (!isRead) { epoch++; return liveRun(action, data, false); }
+    if (!isRead) { epoch++; return /^auth\./.test(action) ? liveRunRetry(action, data, false) : liveRun(action, data, false); }
     var useGet = READ_PUB.test(action) && action !== 'ping';
     if (opts.fresh) data = Object.assign({ _fresh: true }, data);
     var k = epoch + '|' + action + '|' + Sesi.token() + '|' + JSON.stringify(data);
     if (inflight[k]) return inflight[k];
-    var p = liveRun(action, data, useGet);
+    var p = liveRunRetry(action, data, useGet);
     inflight[k] = p;
     p.then(function () { delete inflight[k]; }, function () { delete inflight[k]; });
     return p;
@@ -79,7 +85,7 @@
   /* ---------- boot publik dengan SWR ---------- */
   function bootCached() { var c = lsGet(LS.boot, null); return c && c.data ? c.data : null; }
   function boot() {
-    return call('pub.boot').then(function (r) { if (r && r.success) lsSet(LS.boot, { at: Date.now(), data: r.data }); return r; });
+    return call('pub.boot').then(function (r) { if (r && r.success) { lsSet(LS.boot, { at: Date.now(), data: r.data }); if (r.data && r.data.googleClientId) lsSet('edugame_gcid', r.data.googleClientId); } return r; });
   }
   function warmUp() {
     if (!LIVE) return;
@@ -119,14 +125,7 @@
      Hanya untuk mencoba tampilan; data TIDAK dibagikan antar perangkat.
      ============================================================ */
   var Demo = (function () {
-    var TPL = [
-      ['TMPL-01', 'Kuis Kilat Pilihan Ganda', 'kuis', 'Balapan skor poin kompetitif dengan hitungan mundur, combo streak, dan umpan balik langsung.', 'A,B,C,D', 'individu', 5, 15, 'timer', '#1E40AF'],
-      ['TMPL-02', 'Teka-Teki Silang Edukatif', 'tts', 'Isi kotak silang dari petunjuk berbasis materi untuk menguatkan kosakata ilmiah.', 'C,D', 'individu', 10, 30, 'grid', '#7C3AED'],
-      ['TMPL-03', 'Petualangan Kartu & Memori', 'kartu', 'Cocokkan pasangan istilah dan artinya sambil melatih daya ingat dan asosiasi.', 'A,B,C', 'individu', 5, 20, 'cards', '#0891B2'],
-      ['TMPL-04', 'Duel Cepat Tanggap Tim', 'duel', 'Dua kelompok berebut menjawab di satu layar kelas — cocok untuk Smart TV atau proyektor.', 'B,C,D', 'kelompok', 10, 40, 'swords', '#DC2626'],
-      ['TMPL-05', 'Susun Balok Urutan Logika', 'balok', 'Susun langkah proses atau peristiwa dengan urutan yang benar untuk melatih penalaran.', 'C,D', 'individu', 10, 30, 'blocks', '#059669'],
-      ['TMPL-06', 'Labirin Trivia Interaktif', 'labirin', 'Jelajahi labirin dan buka gerbang dengan menjawab pertanyaan; tiga nyawa untuk bertahan.', 'C,D', 'individu', 10, 40, 'compass', '#9333EA']
-    ];
+    var TPL = Content.CATALOG.map(function (c) { return [c.id, c.nama, c.engine, c.deskripsi, c.fase, c.mode, c.dmin, c.dmax, c.ikon, c.warna]; });
     function uid(p) { return p + '_' + Math.random().toString(36).slice(2, 12); }
     function iso() { return new Date().toISOString(); }
     function db() {
@@ -177,7 +176,7 @@
           var g = d.games.filter(function (x) { return x.kode === kode && x.status === 'aktif'; })[0];
           if (!g) return fail('Kode permainan tidak ditemukan atau sudah ditutup.', { code: 'NOT_FOUND' });
           var o = ringan(g, d); var kn = JSON.parse(JSON.stringify(g.konten)); o.guru = (d.guru.filter(function (x) { return x.email === g.email_guru; })[0] || {}).nama || '';
-          if (g.asesmen === 'sumatif' && kn.questions && /^(kuis|duel|labirin)$/.test(g.engine)) { kn.questions = kn.questions.map(function (q) { return { q: q.q, options: q.options }; }); o.kunciTersembunyi = true; }
+          if (g.asesmen === 'sumatif' && Content.bisaDisembunyi(g.engine)) { kn = Content.sembunyi(g.engine, kn); o.kunciTersembunyi = true; }
           o.konten = kn; delete o.siswa; delete o.rata; delete o.tuntas; return ok(o);
         }
         case 'pub.submit': {
@@ -187,11 +186,8 @@
           (data.peserta || []).slice(0, 8).forEach(function (p, idx) {
             var nama = String(p.nama || '').trim().slice(0, 60); if (!nama) return;
             var total, benar, skor;
-            if (gm.engine === 'kuis' || gm.engine === 'labirin') {
-              total = gm.konten.questions.length; benar = 0;
-              (idx === 0 ? data.jawaban || [] : []).forEach(function (j) { var q = gm.konten.questions[j.i]; if (q && Number(j.p) === q.answer) benar++; });
-              skor = Math.round(benar / total * 100);
-            } else { total = Math.max(1, Math.min(100, parseInt(p.total, 10) || 1)); benar = Math.max(0, Math.min(total, parseInt(p.benar, 10) || 0)); skor = Math.max(0, Math.min(100, Math.round(Number(p.skor) || 0))); }
+            var ns = idx === 0 ? Content.nilai(gm.engine, gm.konten, data.jawaban || []) : null;
+            if (ns) { total = ns.total; benar = ns.benar; skor = Math.round(benar / total * 100); } else { total = Math.max(1, Math.min(100, parseInt(p.total, 10) || 1)); benar = Math.max(0, Math.min(total, parseInt(p.benar, 10) || 0)); skor = Math.max(0, Math.min(100, Math.round(Number(p.skor) || 0))); }
             var row = { id: uid('h'), id_permainan: gm.id, kode: gm.kode, nama: nama, kelas: String(p.kelas || '').slice(0, 30), skor: skor, benar: benar, total: total, durasi: Math.max(0, Math.min(7200, parseInt(p.durasi, 10) || 0)), tanggal: iso(), detail: idx === 0 ? { j: (data.jawaban || []).map(function (j) { return [j.i, j.p]; }) } : { tim: true } };
             d.hasil.push(row); hasil.push({ nama: nama, skor: skor, benar: benar, total: total });
           });
@@ -249,6 +245,7 @@
           return ok({ rows: rows, games: mg.map(function (g) { return ringan(g, d); }) });
         }
         case 'prompt.simpan': d.prompts.push({ email: sesi.me.email, isi: String(data.isi || '').slice(0, 2000), opsi: data.opsi, tanggal: iso() }); save(d); return ok(null, 'Riwayat prompt tersimpan.');
+        case 'ai.tes': return fail('Mode demo: tes koneksi AI memerlukan backend Apps Script.');
         case 'ai.generate': return fail('Pembuatan otomatis tidak tersedia di mode demo. Gunakan "Salin Prompt", atau pasang backend Apps Script lalu isi GEMINI_API_KEY.', { code: 'NO_AI' });
         case 'konten.validasi': {
           try { var raw = typeof data.konten === 'string' ? Content.parseAI(data.konten) : data.konten; return ok(Content.konten(data.engine, raw)); } catch (e3) { return fail(e3.message); }
