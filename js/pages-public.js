@@ -142,7 +142,7 @@
       var last = Api.lsGet('edugame_siswa', {}), info = Content.ENGINE_INFO[game.engine] || {}, tim = game.engine === 'duel' || game.mode === 'kelompok' && game.engine === 'duel';
       var kelasOpt = Content.daftarKelasSiswa(game).map(function (k) { return '<option' + (last.kelas === k ? ' selected' : '') + '>' + esc(k) + '</option>'; }).join('');
       var n = Content.jumlahItem(game.engine, game.konten);
-      shell(head() + '<div class="play-card card-fx"><div class="found"><div class="found-top"><span>' + ic('checkc', 16) + ' MISI DITEMUKAN!</span><span class="pill">' + n + ' ' + ((info.sat || 'soal').replace('butir soal', 'soal')) + '</span></div><h2>' + esc(game.judul) + '</h2><div class="found-meta">' + ic('user', 15) + ' ' + esc(game.guru || 'Guru') + ' • ' + ic('timer', 15) + ' ' + game.durasi + ' menit • ' + esc(info.nama || '') + '</div></div>' +
+      shell(head() + '<div class="play-card card-fx"><div class="found"><div class="found-top"><span>' + ic('checkc', 16) + ' MISI DITEMUKAN!</span><span class="pill">' + n + ' ' + ((info.sat || 'soal').replace('butir soal', 'soal')) + '</span></div><h2>' + esc(game.judul) + '</h2><div class="found-meta">' + (game.sekolah ? '🏫 ' + esc(game.sekolah) + ' • ' : '') + ic('user', 15) + ' ' + esc(game.guru || 'Guru') + ' • ' + ic('timer', 15) + ' ' + game.durasi + ' menit • ' + esc(info.nama || '') + '</div></div>' +
         '<h3 class="step-h"><span>2</span> Identitas Pemain</h3><form id="pf">' +
         (tim ? '<div class="grid2"><label class="lbl">Nama Tim 1<input id="t1" class="inp" maxlength="30" value="Tim Elang" required></label><label class="lbl">Nama Tim 2<input id="t2" class="inp" maxlength="30" value="Tim Harimau" required></label></div>'
           : '<label class="lbl">Nama lengkap / panggilan <em>Wajib</em><input id="nm" class="inp" maxlength="60" value="' + esc(last.nama || '') + '" required autocomplete="name"></label>') +
@@ -165,6 +165,13 @@
       document.body.classList.add('in-arena');
       shell(head().replace('play-head', 'play-head play-head-min') + '<div id="arena"></div>');
       var t0 = Date.now();
+      if (game.engine === 'html') {
+        ctl = HtmlGame.mount($('#arena'), game, pl, { preview: uji,
+          submit: function (pp) { return Api.kirimHasil({ kode: game.kode, nonce: Date.now() % 100000, peserta: [pp], jawaban: [] }); },
+          onQuit: function () { document.body.classList.remove('in-arena'); App.go('/main/' + encodeURIComponent(game.kode)); } });
+        UI.onCleanup(function () { if (ctl) { try { ctl.destroy(); } catch (e) { /* abaikan */ } } });
+        return;
+      }
       ctl = Games.start($('#arena'), game, pl, function (res) { ctl.destroy(); hasil(pl, res, Math.round((Date.now() - t0) / 1000)); }, function () { document.body.classList.remove('in-arena'); App.go('/main/' + encodeURIComponent(game.kode)); });
       UI.onCleanup(function () { if (ctl) { try { ctl.destroy(); } catch (e) { /* abaikan */ } } });   // bersihkan timer & pendengar tombol saat berpindah halaman
     }
@@ -176,12 +183,20 @@
         (menang && menang[0].skor !== menang[1].skor ? '<h1>🏆 ' + esc(menang[0].nama) + ' menang!</h1>' : menang ? '<h1>Seri! Dua tim sama kuat</h1>' : '<h1>' + (skor >= 75 ? 'Hebat, ' : 'Semangat, ') + esc(utama.nama.split(' ')[0]) + '!</h1>') +
         '<p class="muted" id="umpan">' + (skor >= 90 ? 'Luar biasa! Pemahamanmu sangat kuat.' : skor >= 75 ? 'Bagus sekali! Kamu sudah menguasai materi ini.' : skor >= 60 ? 'Cukup baik. Pelajari lagi bagian yang masih salah, ya.' : 'Jangan menyerah! Coba ulangi dan baca materinya sekali lagi.') + '</p>' +
         '<div class="res-grid">' + rows.map(function (r) { return '<div class="res-i"><b>' + esc(r.nama) + '</b><span>' + r.benar + ' / ' + r.total + ' benar • skor ' + r.skor + '</span></div>'; }).join('') + '<div class="res-i"><b>Waktu</b><span>' + UI.fmtDur(dur) + '</span></div></div>' +
-        '<div id="svs" class="save-s"><div class="spin sm"></div> Menyimpan nilai…</div><div class="res-act"><button class="btn btn-primary btn-lg glow shine" id="again">Main Lagi ' + ic('refresh', 18) + '</button><a class="btn btn-outline btn-lg" href="#/main">Kode Lain</a></div></div>');
+        '<div id="svs" class="save-s"><div class="spin sm"></div> Menyimpan nilai…</div><div id="rk" class="rk-w"></div><div class="res-act"><button class="btn btn-primary btn-lg glow shine" id="again">Main Lagi ' + ic('refresh', 18) + '</button><a class="btn btn-outline btn-lg" href="#/main">Kode Lain</a></div></div>');
       UI.bind(root_()); if (skor >= 75) { UI.confetti(); Games.sfx.win(); }
       $('#again').addEventListener('click', function () { identitas(); });
       if (uji) { $('#svs').innerHTML = ic('eye', 16) + ' Mode uji coba — nilai tidak disimpan.'; return; }
       Api.kirimHasil({ kode: game.kode, nonce: Date.now() % 100000, peserta: rows.map(function (r) { return { nama: r.nama, kelas: r.kelas, avatar: r.avatar, skor: r.skor, benar: r.benar, total: r.total, durasi: dur }; }), jawaban: res.jawaban }).then(function (r) {
         var s = $('#svs'); if (!s) return;
+        if (r.success && r.data && r.data.rank) {
+          var rkEl = document.getElementById('rk');
+          if (rkEl) {
+            rkEl.innerHTML = Rank.html(r.data.rank, r.data.rank.me) + '<button type="button" class="btn btn-soft btn-sm" id="rkref">' + ic('refresh', 16) + ' Muat ulang peringkat</button>';
+            var rb = document.getElementById('rkref');
+            if (rb) rb.addEventListener('click', function () { rb.disabled = true; Api.call('pub.rank', { kode: game.kode, nama: utama.nama, kelas: utama.kelas }).then(function (rr) { var z = document.getElementById('rk'); if (rr.success && z) { z.innerHTML = Rank.html(rr.data, rr.data.me) + '<span class="muted">Peringkat diperbarui.</span>'; } else rb.disabled = false; }); });
+          }
+        }
         if (r.success) { s.innerHTML = '<span class="good">' + ic('checkc', 16) + ' Nilai tersimpan untuk guru.</span>'; if (r.data && r.data.hasil && r.data.hasil[0] && game.kunciTersembunyi) { var sv = r.data.hasil[0].skor, rg = $('#ring'), sk = $('#sk'), um = $('#umpan'); if (um) um.textContent = r.data.umpan; if (rg) rg.style.background = 'conic-gradient(var(--accent) ' + (sv * 3.6) + 'deg, #E2E8F0 0)'; if (sk) { sk.setAttribute('data-count', sv); UI.countUp(sk); } } }
         else if (r.queued) s.innerHTML = '<span class="warn">' + ic('bell', 16) + ' Koneksi bermasalah — nilai disimpan di perangkat dan dikirim ulang otomatis.</span>';
         else s.innerHTML = '<span class="bad">' + ic('x', 16) + ' ' + esc(r.message) + '</span>';

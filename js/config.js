@@ -11,7 +11,7 @@ window.APP_CONFIG = {
   // Nomor WhatsApp untuk tombol chat mengambang (format internasional tanpa +).
   // Admin juga bisa mengubahnya dari Admin > Pengaturan (menimpa nilai ini).
   WA_NOMOR: '6281371164131',
-  WA_PESAN: 'Halo EduGame AI, saya ingin bertanya tentang pembuatan game pembelajaran.',
+  WA_PESAN: 'Halo creator EduGame AI, saya ingin bertanya tentang pembuatan game pembelajaran.',
 
   // Interval otomatis slideshow (milidetik)
   SLIDE_HERO_MS: 6000,

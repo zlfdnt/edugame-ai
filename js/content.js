@@ -20,6 +20,8 @@
   var ENGINE_INFO = {};
   CATALOG.forEach(function (c) { ENGINE_INFO[c.engine] = c; });
   var TIPE = {}; CATALOG.forEach(function (c) { TIPE[c.engine] = c.tipe; });
+  ENGINE_INFO.html = { id: 'TMPL-HTML', engine: 'html', nama: 'Game HTML dari AI', deskripsi: 'Game buatan AI yang langsung jadi (satu berkas HTML).', fase: 'A,B,C,D', mode: 'individu', dmin: 5, dmax: 60, ikon: 'sparkles', warna: '#7C3AED', kat: 'ai', tipe: 'html', sat: 'game', n: [1, 1, 1], ciri: ['Dibuat langsung oleh AI', 'Tampil di kotak aman (sandbox)', 'Peringkat otomatis'], dimensi: ['Kreativitas', 'Mandiri'], emoji: '✨', tampil: '' };
+  TIPE.html = 'html';
 
   /* ---------- normalisasi (cermin Kode.gs) ---------- */
   function teks(v, maks) { return String(v === undefined || v === null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, maks || 300); }
@@ -47,7 +49,7 @@
       if (!isFinite(ans) || ans < 0 || ans >= opsi.length) throw new Error('Soal ' + (i + 1) + ': kunci jawaban (answer) tidak cocok dengan pilihan.');
       var t = teks(q.q || q.pertanyaan || q.question, 400);
       if (!t) throw new Error('Soal ' + (i + 1) + ': teks pertanyaan kosong.');
-      return { q: t, options: opsi, answer: ans, explain: teks(q.explain || q.penjelasan, 400), emoji: emo(q.emoji) };
+      return { q: t, options: opsi, answer: ans, explain: teks(q.explain || q.penjelasan, 400), emoji: emo(q.emoji), stimulus: teks(q.stimulus || q.narasi || q.bacaan, 900) };
     });
   }
   function boolOf(v) { if (typeof v === 'boolean') return v; var s = String(v).trim().toLowerCase(); if (['true', 'benar', 'b', '1', 'ya'].indexOf(s) > -1) return true; if (['false', 'salah', 's', '0', 'tidak'].indexOf(s) > -1) return false; return null; }
@@ -91,7 +93,7 @@
         var t = teks(x.text || x.pernyataan, 300), b = boolOf(x.benar !== undefined ? x.benar : x.answer);
         if (!t) throw new Error('Pernyataan ' + (i + 1) + ': teks kosong.');
         if (b === null) throw new Error('Pernyataan ' + (i + 1) + ': isi "benar" dengan true atau false.');
-        return { text: t, benar: b, explain: teks(x.explain || x.penjelasan, 300), emoji: emo(x.emoji) };
+        return { text: t, benar: b, explain: teks(x.explain || x.penjelasan, 300), emoji: emo(x.emoji), stimulus: teks(x.stimulus || x.narasi, 900) };
       });
     } else if (tipe === 'items') {
       var it = k.items || k.isian;
@@ -99,7 +101,7 @@
       out.items = it.slice(0, 30).map(function (x, i) {
         var q = teks(x.q || x.kalimat, 300), a = teks(x.answer || x.jawaban, 40);
         if (!q || !a) throw new Error('Butir ' + (i + 1) + ': kalimat (q) dan jawaban (answer) wajib.');
-        return { q: q, answer: a, accept: (x.accept || []).map(function (v) { return teks(v, 40); }).filter(Boolean).slice(0, 6), explain: teks(x.explain, 300), emoji: emo(x.emoji) };
+        return { q: q, answer: a, accept: (x.accept || []).map(function (v) { return teks(v, 40); }).filter(Boolean).slice(0, 6), explain: teks(x.explain, 300), emoji: emo(x.emoji), stimulus: teks(x.stimulus || x.narasi, 900) };
       });
     } else if (tipe === 'groups') {
       var g = k.groups || k.kelompok;
@@ -116,10 +118,15 @@
       var pr = k.problems || k.soal_hitung;
       if (!Array.isArray(pr) || pr.length < 4) throw new Error('Butuh minimal 4 soal pada "problems".');
       out.problems = pr.slice(0, 30).map(function (x, i) {
-        var a = Number(String(x.answer !== undefined ? x.answer : x.jawaban).replace(',', '.')), q = teks(x.q || x.soal, 120);
+        var a = Number(String(x.answer !== undefined ? x.answer : x.jawaban).replace(',', '.')), q = teks(x.q || x.soal, 300);
         if (!q || !isFinite(a)) throw new Error('Soal hitung ' + (i + 1) + ': soal (q) dan jawaban angka (answer) wajib.');
-        return { q: q, answer: a, emoji: emo(x.emoji) };
+        return { q: q, answer: a, emoji: emo(x.emoji), stimulus: teks(x.stimulus || x.narasi, 900) };
       });
+    } else if (tipe === 'html') {
+      var h = String(k.html || '');
+      if (h.length < 300) throw new Error('Kode HTML terlalu pendek untuk sebuah game.');
+      if (h.length > 350000) throw new Error('Kode HTML terlalu besar (maksimal ±350.000 karakter).');
+      out.html = h;
     } else if (tipe === 'cards') {
       var cd = k.cards || k.kartu;
       if (!Array.isArray(cd) || cd.length < 4) throw new Error('Butuh minimal 4 kartu pada "cards".');
@@ -133,6 +140,7 @@
   }
   function jumlahItem(engine, k) {
     if (!k) return 0;
+    if (k.html) return 1;
     var a = k.questions || k.pairs || k.sequences || k.words || k.statements || k.items || k.groups || k.problems || k.cards;
     if (k.groups) return k.groups.reduce(function (s, g) { return s + g.items.length; }, 0);
     return a ? a.length : 0;
@@ -158,10 +166,10 @@
   function bisaDisembunyi(engine) { return engine !== 'duel' && !!daftarKunci(engine, { questions: [], statements: [], items: [], problems: [] }); }
   function sembunyi(engine, k) {
     var o = JSON.parse(JSON.stringify(k)), t = TIPE[engine];
-    if (t === 'questions') o.questions = o.questions.map(function (q) { return { q: q.q, options: q.options, emoji: q.emoji }; });
-    else if (t === 'statements') o.statements = o.statements.map(function (q) { return { text: q.text, emoji: q.emoji }; });
-    else if (t === 'items') o.items = o.items.map(function (q) { return { q: q.q, emoji: q.emoji }; });
-    else if (t === 'problems') o.problems = o.problems.map(function (q) { return { q: q.q, emoji: q.emoji }; });
+    if (t === 'questions') o.questions = o.questions.map(function (q) { return { q: q.q, options: q.options, emoji: q.emoji, stimulus: q.stimulus }; });
+    else if (t === 'statements') o.statements = o.statements.map(function (q) { return { text: q.text, emoji: q.emoji, stimulus: q.stimulus }; });
+    else if (t === 'items') o.items = o.items.map(function (q) { return { q: q.q, emoji: q.emoji, stimulus: q.stimulus }; });
+    else if (t === 'problems') o.problems = o.problems.map(function (q) { return { q: q.q, emoji: q.emoji, stimulus: q.stimulus }; });
     return o;
   }
 
@@ -176,7 +184,8 @@
     { q: 'Bagian tumbuhan yang berperan dalam perkembangbiakan generatif adalah ...', options: ['Akar', 'Batang', 'Daun', 'Bunga'], answer: 3, explain: 'Bunga menghasilkan serbuk sari dan putik untuk membentuk biji.', emoji: '🌸' },
     { q: 'Biji yang ditanam dan mendapat air serta suhu cukup akan tumbuh menjadi ...', options: ['Batu', 'Tanah', 'Kecambah', 'Pupuk'], answer: 2, explain: 'Biji berkecambah menjadi tumbuhan baru.', emoji: '🫘' }
   ];
-  function contoh(engine) {
+  function contoh(engine, bentuk) {
+    if (bentuk === 'narasi') { var nr = contohNarasi(engine); if (nr) return nr; }
     var meta = { judul: 'Bagian Tubuh Tumbuhan dan Fungsinya', mapel: 'IPAS', topik: 'Bagian tubuh tumbuhan', fase: 'B' }, t = TIPE[engine];
     if (t === 'pairs') return { meta: meta, pairs: [{ a: 'Akar', b: 'Menyerap air' }, { a: 'Batang', b: 'Mengangkut zat' }, { a: 'Daun', b: 'Fotosintesis' }, { a: 'Bunga', b: 'Alat perkembangbiakan' }, { a: 'Buah', b: 'Pelindung biji' }, { a: 'Biji', b: 'Calon tumbuhan baru' }] };
     if (t === 'words') return { meta: meta, words: [{ word: 'AKAR', clue: 'Bagian tumbuhan yang menyerap air dari tanah', emoji: '🌱' }, { word: 'DAUN', clue: 'Tempat terjadinya fotosintesis', emoji: '🍃' }, { word: 'BATANG', clue: 'Menopang tumbuhan dan mengangkut zat', emoji: '🌳' }, { word: 'BUNGA', clue: 'Alat perkembangbiakan generatif', emoji: '🌸' }, { word: 'BIJI', clue: 'Calon tumbuhan baru', emoji: '🫘' }, { word: 'KLOROFIL', clue: 'Zat hijau daun', emoji: '🟢' }] };
@@ -196,6 +205,33 @@
     return { meta: meta, questions: SOAL_CONTOH };
   }
 
+
+  var CERITA = 'Bu Sari menanam bibit kacang hijau di dua pot. Pot A diletakkan di dekat jendela yang terkena sinar matahari dan disiram setiap pagi. Pot B diletakkan di dalam lemari yang gelap, tetapi tetap disiram setiap pagi. Setelah seminggu, tanaman di pot A tumbuh hijau dan segar, sedangkan tanaman di pot B pucat dan kurus.';
+  function contohNarasi(engine) {
+    var meta = { judul: 'Percobaan Bu Sari: Tumbuhan dan Cahaya', mapel: 'IPAS', topik: 'Kebutuhan tumbuhan', fase: 'B' }, t = TIPE[engine];
+    if (t === 'questions') return { meta: meta, questions: [
+      { stimulus: CERITA, q: 'Berdasarkan cerita, apa perbedaan perlakuan antara pot A dan pot B?', options: ['Jumlah air', 'Jumlah sinar matahari', 'Jenis bibit', 'Ukuran pot'], answer: 1, explain: 'Keduanya sama-sama disiram; yang berbeda adalah paparan sinar matahari.', emoji: '🧪' },
+      { stimulus: CERITA, q: 'Mengapa tanaman di pot B tampak pucat dan kurus?', options: ['Tidak mendapat cahaya untuk fotosintesis', 'Terlalu banyak air', 'Akarnya terlalu panjang', 'Daunnya terlalu banyak'], answer: 0, explain: 'Tanpa cahaya, daun tidak dapat berfotosintesis dengan baik.', emoji: '🌑' },
+      { stimulus: CERITA, q: 'Kesimpulan yang paling tepat dari percobaan Bu Sari adalah ...', options: ['Tumbuhan tidak perlu air', 'Tumbuhan hijau membutuhkan cahaya matahari untuk tumbuh sehat', 'Bibit kacang hijau tumbuh terbaik di tempat gelap', 'Air tidak berpengaruh bagi tumbuhan'], answer: 1, explain: 'Pot A yang terkena cahaya tumbuh sehat, pot B tidak.', emoji: '📝' },
+      { stimulus: CERITA, q: 'Jika pot B dipindahkan ke dekat jendela, apa yang kemungkinan terjadi?', options: ['Tanaman mati seketika', 'Tanaman perlahan menjadi lebih hijau', 'Tanaman berubah menjadi bunga', 'Tanaman berhenti tumbuh selamanya'], answer: 1, explain: 'Dengan cahaya, klorofil terbentuk dan tanaman pulih.', emoji: '🪟' },
+      { stimulus: CERITA, q: 'Bagian tumbuhan yang paling berperan menangkap cahaya pada percobaan itu adalah ...', options: ['Akar', 'Daun', 'Biji', 'Pot'], answer: 1, explain: 'Daun mengandung klorofil penangkap cahaya.', emoji: '🍃' }] };
+    if (t === 'statements') return { meta: meta, statements: [
+      { stimulus: CERITA, text: 'Percobaan ini membandingkan pengaruh cahaya matahari terhadap pertumbuhan.', benar: true, explain: 'Variabel yang diubah adalah cahaya.', emoji: '🧪' },
+      { stimulus: CERITA, text: 'Pot B pucat karena kekurangan air.', benar: false, explain: 'Pot B tetap disiram; penyebabnya kurang cahaya.', emoji: '💧' },
+      { stimulus: CERITA, text: 'Pot A adalah kelompok yang mendapat cahaya matahari.', benar: true, explain: 'Pot A di dekat jendela.', emoji: '☀️' },
+      { stimulus: CERITA, text: 'Hasil percobaan menunjukkan tumbuhan hijau tidak memerlukan cahaya.', benar: false, explain: 'Hasilnya justru menunjukkan tumbuhan memerlukan cahaya.', emoji: '🌱' }] };
+    if (t === 'items') return { meta: meta, items: [
+      { stimulus: CERITA, q: 'Pot yang tumbuh hijau dan segar adalah pot ____.', answer: 'A', accept: ['pot a'], emoji: '🪴' },
+      { stimulus: CERITA, q: 'Faktor yang berbeda antara kedua pot adalah ____ matahari.', answer: 'cahaya', accept: ['sinar', 'sinar matahari'], emoji: '☀️' },
+      { stimulus: CERITA, q: 'Proses pembuatan makanan pada daun yang membutuhkan cahaya disebut ____.', answer: 'fotosintesis', emoji: '🍃' }] };
+    if (t === 'problems') return { meta: { judul: 'Soal Cerita Kebun Sekolah', mapel: 'Matematika', topik: 'Operasi hitung', fase: 'B' }, problems: [
+      { stimulus: 'Pak Budi menanam jagung di kebun sekolah dalam 4 baris. Setiap baris berisi 12 tanaman.', q: 'Berapa seluruh tanaman jagung yang ditanam Pak Budi?', answer: 48, emoji: '🌽' },
+      { stimulus: 'Dari 48 tanaman jagung, 9 tanaman layu karena kekeringan.', q: 'Berapa tanaman jagung yang masih hidup?', answer: 39, emoji: '🥀' },
+      { stimulus: 'Setiap tanaman jagung yang hidup menghasilkan 2 tongkol.', q: 'Dari 39 tanaman yang hidup, berapa tongkol yang dihasilkan?', answer: 78, emoji: '🌽' },
+      { stimulus: 'Tongkol dibagikan sama banyak kepada 6 kelompok siswa.', q: 'Jika ada 78 tongkol, berapa tongkol yang diterima tiap kelompok?', answer: 13, emoji: '👧' }] };
+    return null;
+  }
+
   /* ---------- TP & unsur pembelajaran mendalam (otomatis) ---------- */
   var KATA_KERJA = { A: ['mengenal', 'menyebutkan', 'menunjukkan'], B: ['mengidentifikasi', 'menjelaskan', 'menghubungkan'], C: ['menganalisis', 'menerapkan', 'membandingkan'], D: ['menganalisis', 'mengevaluasi', 'menyimpulkan'] };
   function susunTP(m) {
@@ -210,6 +246,34 @@
   }
   function ringkasUnsur(u) { return 'Prinsip: Berkesadaran, Bermakna, Menggembirakan. Pengalaman belajar: ' + u.pengalaman.join(', ') + '. Dimensi profil: ' + u.dimensi.join(', ') + '.'; }
 
+
+  /* ---------- musik latar (parameter unik tiap game) & tema visual ---------- */
+  var BGM = { kuis: [124, 60, 'maj', 'triangle', 3], tts: [96, 62, 'dor', 'sine', 11], kartu: [108, 64, 'pent', 'triangle', 5], duel: [140, 57, 'min', 'square', 9], balok: [100, 65, 'mixo', 'triangle', 14], labirin: [112, 55, 'hira', 'sine', 21],
+    benarsalah: [132, 67, 'maj', 'square', 8], cocok: [104, 59, 'lyd', 'triangle', 17], anagram: [116, 61, 'dor', 'square', 4], gantung: [92, 52, 'blues', 'triangle', 23], carikata: [100, 63, 'pent', 'sine', 12], isian: [90, 60, 'dor', 'sine', 6],
+    kelompok: [110, 58, 'mixo', 'triangle', 19], balon: [126, 66, 'lyd', 'sine', 2], tikus: [150, 62, 'pent', 'square', 13], roda: [136, 64, 'maj', 'sawtooth', 10], kotak: [118, 56, 'hira', 'triangle', 25], pesawat: [144, 59, 'mixo', 'square', 7],
+    katak: [120, 65, 'pent', 'triangle', 16], roket: [134, 53, 'min', 'sawtooth', 20], balap: [148, 57, 'blues', 'square', 15], ulartangga: [114, 60, 'lyd', 'triangle', 22], hitung: [128, 62, 'maj', 'square', 1], kartukilat: [88, 64, 'dor', 'sine', 18], html: [120, 60, 'maj', 'triangle', 30] };
+  var SKALA_NAMA = { maj: 'mayor (ceria)', min: 'minor (tegang seru)', pent: 'pentatonik (santai)', dor: 'dorian (tenang berpikir)', lyd: 'lydian (ajaib)', blues: 'blues (misterius)', mixo: 'mixolydian (petualang)', hira: 'hirajoshi (misterius lembut)' };
+  var TEMA = { kuis: 'sky', tts: 'paper', kartu: 'candy', duel: 'arena', balok: 'forest', labirin: 'forest', benarsalah: 'sky', cocok: 'candy', anagram: 'paper', gantung: 'night', carikata: 'sea', isian: 'paper', kelompok: 'desert', balon: 'sky', tikus: 'forest', roda: 'candy', kotak: 'night', pesawat: 'sky', katak: 'sea', roket: 'space', balap: 'desert', ulartangga: 'ice', hitung: 'night', kartukilat: 'ice', html: 'sky' };
+  var TEMA_DESK = { sky: 'langit biru cerah dengan awan yang bergeser perlahan, bukit hijau di bawah, matahari tersenyum (nuansa platformer klasik)', space: 'angkasa luar ungu-biru tua dengan bintang berkelip, planet, dan komet', sea: 'bawah laut biru-toska dengan gelembung naik, rumput laut, dan ikan kecil', forest: 'hutan hijau dengan pohon, kupu-kupu, dan sinar matahari menembus daun', candy: 'dunia permen pastel (merah muda, kuning, ungu) dengan bentuk melayang dan bintang berkilau', night: 'langit malam biru tua dengan bulan, bintang, dan kunang-kunang', desert: 'gurun hangat jingga-kuning dengan kaktus, matahari besar, dan bukit pasir', ice: 'dunia salju biru muda dengan kepingan salju turun dan igloo', arena: 'arena kompetisi dengan dua sisi warna (biru dan merah), lampu sorot, dan sorak penonton', paper: 'meja belajar hangat dengan buku, pensil, dan kertas bergaris (nuansa sekolah ceria)' };
+  var SUARA_JS = "var Suara=(function(){var C=null,aktif=true,mus=null,lastO=null;\n" +
+    "function ac(){if(!C){try{C=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}if(C&&C.state==='suspended')C.resume();return C;}\n" +
+    "function nada(f,d,t,v,w){var c=ac();if(!c||!aktif)return;var o=c.createOscillator(),g=c.createGain(),s=c.currentTime+(t||0);o.type=w||'sine';o.frequency.value=f;g.gain.setValueAtTime(v||.08,s);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+d+.02);}\n" +
+    "var SK={maj:[0,2,4,5,7,9,11],min:[0,2,3,5,7,8,10],pent:[0,2,4,7,9],dor:[0,2,3,5,7,9,10],lyd:[0,2,4,6,7,9,11],blues:[0,3,5,6,7,10],mixo:[0,2,4,5,7,9,10],hira:[0,2,3,7,8]};\n" +
+    "function hz(m){return 440*Math.pow(2,(m-69)/12);}\n" +
+    "function rnd(s){return function(){s=(s*1664525+1013904223)%4294967296;return s/4294967296;};}\n" +
+    "function berhenti(){if(mus){clearInterval(mus);mus=null;}}\n" +
+    "function musik(o){lastO=o;berhenti();if(!aktif)return;var c0=ac();if(!c0)return;var sk=SK[o.skala]||SK.maj,r=rnd(o.seed||1),step=60/o.bpm/2,pat=[],prog=[0,3,4,3],t0=c0.currentTime+.1,i=0;\n" +
+    "for(var k=0;k<16;k++){pat.push(r()<.28?-1:Math.floor(r()*sk.length));}\n" +
+    "mus=setInterval(function(){var c=ac();if(!c||!aktif)return;while(t0<c.currentTime+.3){var bar=Math.floor(i/16)%4,st=i%16,ak=o.akar+sk[prog[bar]%sk.length];if(st%4===0)nada(hz(ak-12),step*3.6,t0-c.currentTime,.05,'triangle');var d=pat[st];if(d>=0)nada(hz(ak+sk[d]+(st%8>=4?12:0)),step*.9,t0-c.currentTime,.035,o.gelombang||'triangle');t0+=step;i++;}},90);}\n" +
+    "return{musik:musik,berhenti:berhenti,bisu:function(b){aktif=!b;if(b)berhenti();else if(lastO)musik(lastO);},\n" +
+    "klik:function(){nada(520,.06,0,.05,'square');},benar:function(){nada(660,.12,0,.08,'triangle');nada(880,.16,.1,.08,'triangle');},salah:function(){nada(200,.25,0,.07,'sawtooth');},menang:function(){[523,659,784,1047].forEach(function(f,k){nada(f,.2,k*.13,.08,'triangle');});}};})();";
+  var SHIM_JS = "window.EduGame=(function(){var info={mode:'preview',nama:'Pemain',kelas:'',avatar:'🙂',kode:'',sekolah:'',guru:'',judul:''},fi=null,fr=null;\n" +
+    "window.addEventListener('message',function(e){var d=e.data||{};if(!d.edugame)return;if(d.type==='init'){for(var k in d.info)info[k]=d.info[k];info.mode='live';if(fi)fi(info);}\n" +
+    "if(d.type==='rank'&&fr)fr(d.rows||[],d.me||null);});\n" +
+    "return{info:function(){return info;},onInit:function(f){fi=f;if(info.mode==='live')f(info);},onRank:function(f){fr=f;},\n" +
+    "finish:function(r){r=r||{};try{parent.postMessage({edugame:1,type:'finish',skor:Math.max(0,Math.min(100,Math.round(+r.skor||0))),benar:+r.benar||0,total:+r.total||0,detail:String(r.detail||'').slice(0,300)},'*');}catch(e){}},\n" +
+    "siap:function(){try{parent.postMessage({edugame:1,type:'ready'},'*');}catch(e){}}};})();";
+
   /* ---------- pembuat prompt ---------- */
   function jumlahButir(engine, m) {
     var c = ENGINE_INFO[engine] || ENGINE_INFO.kuis, d = Number(m.durasi) || 15, mn = c.n[0], mx = c.n[1];
@@ -218,7 +282,7 @@
   }
   var Q4 = '"answer" = nomor urut pilihan yang benar dimulai dari 0 (0=A, 1=B, 2=C, 3=D). Buat 4 pilihan; pengecoh harus masuk akal.';
   var SKEMA = {
-    questions: '{\n  "meta": {"judul": "...", "mapel": "...", "topik": "...", "fase": "B"},\n  "questions": [\n    {"q": "Teks pertanyaan?", "options": ["Pilihan A", "Pilihan B", "Pilihan C", "Pilihan D"], "answer": 1, "explain": "Penjelasan singkat mengapa jawabannya benar.", "emoji": "🌱"}\n  ]\n}\n' + Q4,
+    questions: '{\n  "meta": {"judul": "...", "mapel": "...", "topik": "...", "fase": "B"},\n  "questions": [\n    {"stimulus": "(opsional, wajib bila bentuk soal narasi) teks bacaan / kasus / data", "q": "Teks pertanyaan?", "options": ["Pilihan A", "Pilihan B", "Pilihan C", "Pilihan D"], "answer": 1, "explain": "Penjelasan singkat mengapa jawabannya benar.", "emoji": "🌱"}\n  ]\n}\n' + Q4,
     pairs: '{\n  "meta": {"judul": "...", "mapel": "...", "topik": "...", "fase": "A"},\n  "pairs": [\n    {"a": "Istilah / benda", "b": "Pasangan / arti singkat"}\n  ]\n}\nTiap sisi maksimal 5 kata. Tidak ada pasangan ganda, dan setiap "b" harus hanya cocok dengan satu "a".',
     sequences: '{\n  "meta": {"judul": "...", "mapel": "...", "topik": "...", "fase": "C"},\n  "sequences": [\n    {"title": "Nama proses", "steps": ["Langkah 1 (urutan benar)", "Langkah 2", "Langkah 3", "Langkah 4"]}\n  ]\n}\n"steps" ditulis dalam URUTAN YANG BENAR (aplikasi yang mengacaknya). 3–8 langkah per urutan.',
     words: '{\n  "meta": {"judul": "...", "mapel": "...", "topik": "...", "fase": "D"},\n  "words": [\n    {"word": "FOTOSINTESIS", "clue": "Petunjuk singkat tanpa menyebut kata jawabannya", "emoji": "🌿"}\n  ]\n}\n"word" huruf kapital A–Z saja, tanpa spasi/angka/tanda baca. Istilah dua kata digabung (mis. RANTAIMAKANAN).',
@@ -229,7 +293,7 @@
     cards: '{\n  "meta": {"judul": "...", "mapel": "...", "topik": "...", "fase": "A"},\n  "cards": [\n    {"front": "Istilah / pertanyaan singkat", "back": "Arti / jawaban singkat", "emoji": "🌱"}\n  ]\n}\nSisi depan maksimal 6 kata, sisi belakang maksimal 25 kata.'
   };
   var CATATAN = { duel: 'Pertanyaan harus singkat (maks. 18 kata) karena dijawab dengan berebut cepat; hindari soal hitungan panjang.', labirin: 'Urutkan dari mudah ke sulit.', pesawat: 'Pilihan jawaban sangat pendek (maks. 3 kata) karena tampil di balok kecil.', balon: 'Pilihan jawaban sangat pendek (maks. 3 kata) karena tampil di dalam balon.', tikus: 'Pilihan jawaban sangat pendek (maks. 3 kata).', katak: 'Pilihan jawaban sangat pendek (maks. 3 kata).', carikata: 'Kata maksimal 10 huruf; hindari kata yang terlalu mirip satu sama lain.', gantung: 'Pilih kata 4–10 huruf yang umum dikenal siswa.', anagram: 'Pilih kata 4–10 huruf; petunjuk harus cukup jelas agar bisa ditebak.', tts: 'Pilih kata yang memiliki huruf-huruf bersama agar bisa saling bersilangan.', hitung: 'Sesuaikan tingkat bilangan dengan kelas: SD kelas bawah 1–100, kelas atas hingga ribuan/pecahan sederhana, SMP boleh bilangan bulat negatif.', kelompok: 'Isi item harus konkret dan tidak ambigu.', kartukilat: 'Cocok untuk istilah dan definisi.' };
-  function buatPrompt(m) {
+  function buatPromptJson(m) {
     var info = ENGINE_INFO[m.engine] || ENGINE_INFO.kuis, n = jumlahButir(m.engine, m), u = m.unsur || susunUnsur(m), tipe = info.tipe;
     var sat = tipe === 'groups' ? 'item (total, dibagi ke 2–4 kelompok)' : info.sat;
     var tkt = { mudah: 'Mudah (pengingatan & pemahaman dasar)', sedang: 'Sedang (pemahaman & penerapan sederhana)', bertingkat: 'Bertingkat (campuran mudah ke sulit, termasuk penalaran)' }[m.tingkat] || 'Sedang';
@@ -250,6 +314,8 @@
       '- Tingkat kesulitan: ' + tkt,
       '- Mode bermain    : ' + (m.mode === 'kelompok' ? 'Kelompok / tim' : 'Individu'),
       '- Durasi          : ' + m.durasi + ' menit',
+      m.sekolah ? '- Sekolah         : ' + m.sekolah : '',
+      m.namaGuru ? '- Guru            : ' + m.namaGuru : '',
       '',
       '## TUJUAN PEMBELAJARAN (TP)',
       m.tujuan,
@@ -267,6 +333,7 @@
       '## SPESIFIKASI KONTEN',
       '- Buat tepat ' + n + ' ' + sat + '.',
       '- ' + gaya.join('\n- '),
+      bentukJson(m, tipe),
       '- Pastikan seluruh fakta akurat dan sesuai kurikulum. Jika ragu, pilih fakta yang paling umum diajarkan.',
       '- Variasikan bentuk butir agar permainan tidak monoton, dan buat penjelasan ("explain") yang mendidik dan ramah.',
       CATATAN[m.engine] ? '- ' + CATATAN[m.engine] : '',
@@ -275,6 +342,96 @@
       'Keluarkan HANYA satu objek JSON valid — tanpa penjelasan, tanpa komentar, tanpa teks pembuka/penutup. Boleh dibungkus ```json ... ```.',
       'Struktur:',
       SKEMA[tipe]
+    ].filter(function (x, i, a) { return x !== '' || a[i - 1] !== ''; }).join('\n');
+  }
+
+
+  function bentukJson(m, tipe) {
+    var ada = ['questions', 'statements', 'items', 'problems'].indexOf(tipe) > -1;
+    if (!ada) return '- Bentuk soal: sesuaikan dengan jenis game ini (istilah/kata/pasangan yang ringkas).';
+    if (m.bentuk === 'narasi') return '- BENTUK SOAL = NARASI / ANALISIS: setiap butir wajib memuat "stimulus" (teks bacaan, kasus, cerita, atau data singkat 40–90 kata) lalu pertanyaan bernalar yang hanya bisa dijawab setelah menganalisis stimulus (menganalisis, mengevaluasi, menyimpulkan). Stimulus boleh dipakai bersama beberapa butir (ulangi teksnya pada tiap butir).' + (tipe === 'problems' ? ' Untuk hitungan, jadikan soal cerita kontekstual.' : '');
+    return '- BENTUK SOAL = PERSOALAN SINGKAT: kalimat langsung ke inti (satu konsep per butir), tanpa teks bacaan; kosongkan "stimulus".';
+  }
+  function bentukHtml(m) {
+    if (m.bentuk === 'narasi') return 'NARASI / ANALISIS — tiap butir diawali stimulus (teks bacaan, kasus, cerita, atau data singkat 40–90 kata) yang tampil jelas di layar, lalu pertanyaan bernalar tingkat tinggi (menganalisis, mengevaluasi, menyimpulkan). Stimulus boleh dipakai bersama beberapa butir. Pastikan teks stimulus mudah dibaca (font ≥ 16px, ada tombol "baca lagi" bila stimulus tersembunyi).';
+    return 'PERSOALAN SINGKAT — satu konsep per butir, kalimat langsung ke inti, tanpa teks bacaan panjang, supaya permainan terasa cepat dan ringan.';
+  }
+  function buatPromptHtml(m) {
+    var info = ENGINE_INFO[m.engine] || ENGINE_INFO.kuis, n = jumlahButir(m.engine, m), u = m.unsur || susunUnsur(m), sd = m.jenjang === 'SD', b = BGM[m.engine] || BGM.html, tema = TEMA[m.engine] || 'sky';
+    var tkt = { mudah: 'Mudah (pengingatan & pemahaman dasar)', sedang: 'Sedang (pemahaman & penerapan sederhana)', bertingkat: 'Bertingkat (mudah → sulit, termasuk penalaran)' }[m.tingkat] || 'Sedang';
+    var sat = info.tipe === 'groups' ? 'item (total, dibagi ke 2–4 kelompok)' : info.sat;
+    var musik = "{bpm:" + b[0] + ",akar:" + b[1] + ",skala:'" + b[2] + "',gelombang:'" + b[3] + "',seed:" + b[4] + "}";
+    return [
+      '# BUATKAN GAME EDUKASI YANG LANGSUNG BISA DIMAINKAN — ' + info.nama.toUpperCase(),
+      '',
+      'Peran: Anda adalah pengembang game edukasi profesional (gaya game web ringan seperti di portal game anak) sekaligus guru ahli Kurikulum Merdeka di Indonesia.',
+      '',
+      '## HASIL YANG SAYA MINTA (PALING PENTING)',
+      '1. Langsung buatkan GAME YANG SUDAH JADI dan bisa dimainkan. Keluarkan SATU berkas HTML lengkap (dari <!DOCTYPE html> sampai </html>) di dalam SATU blok kode ```html.',
+      '2. JANGAN mengeluarkan JSON, tabel data, daftar soal mentah, atau penjelasan panjang. Teks di luar blok kode maksimal satu kalimat pembuka.',
+      '3. Jika Anda memiliki fitur pratinjau (Canvas / Artifacts / "Run" / pratinjau langsung), tampilkan hasilnya sebagai game yang langsung dapat dimainkan.',
+      '4. Game harus berjalan sempurna pada percobaan pertama: tanpa galat JavaScript, tanpa placeholder atau TODO, semua soal/butir sudah terisi lengkap dan benar.',
+      '',
+      '## KONTEKS PEMBELAJARAN',
+      '- Sekolah         : ' + (m.sekolah || '(tidak diisi)'),
+      '- Guru            : ' + (m.namaGuru || '(tidak diisi)'),
+      '- Jenjang & kelas : ' + m.jenjang + ' Kelas ' + m.kelas + ' (Fase ' + m.fase + ')',
+      '- Mata pelajaran  : ' + m.mapel,
+      '- Topik utama     : "' + m.materi + '"',
+      '- Jenis asesmen   : ' + (m.asesmen === 'sumatif' ? 'Sumatif (penilaian akhir — JANGAN tampilkan kunci/jawaban benar selama permainan; tampilkan hanya skor dan ringkasan di akhir)' : 'Formatif (latihan — beri umpan balik langsung dan penjelasan singkat setelah menjawab)'),
+      '- Tingkat kesulitan: ' + tkt,
+      '- Durasi bermain  : ±' + m.durasi + ' menit',
+      '- Mode            : ' + (m.mode === 'kelompok' ? 'Kelompok / tim (satu layar bersama)' : 'Individu (satu pemain per perangkat)'),
+      '',
+      '## TUJUAN PEMBELAJARAN (TP)',
+      m.tujuan,
+      '',
+      '## UNSUR PEMBELAJARAN MENDALAM',
+      '- ' + u.prinsip.join('\n- '),
+      '- Pengalaman belajar: ' + u.pengalaman.join(', ') + ' | Dimensi profil: ' + u.dimensi.join(', '),
+      '',
+      '## JENIS GAME & MEKANIK: ' + info.nama,
+      '- ' + info.tampil,
+      CATATAN[m.engine] ? '- Catatan: ' + CATATAN[m.engine] : '',
+      '- Buat tepat ' + n + ' ' + sat + '. Semua isi (soal, jawaban, petunjuk, penjelasan) ditulis LENGKAP di dalam kode game.',
+      '- BENTUK SOAL: ' + bentukHtml(m),
+      '- Bahasa Indonesia yang sesuai usia ' + m.jenjang + ' kelas ' + m.kelas + (sd ? '; kalimat pendek, kosakata sederhana, pilihan jawaban singkat, gunakan emoji tematik sebagai gambar bantu.' : '; istilah ilmiah boleh dipakai bila konteksnya jelas, sertakan butir bernalar, emoji seperlunya.'),
+      '- Pastikan fakta akurat dan sesuai kurikulum; pengecoh harus masuk akal; urutan butir dari mudah ke sulit.',
+      '- Tampilkan nama sekolah dan guru secara halus di layar judul (mis. "' + (m.sekolah || 'Sekolah') + ' • ' + (m.namaGuru || 'Guru') + '").',
+      '',
+      '## TAMPILAN & KESERUAN (acuan: game web ringan populer, orisinal — jangan meniru karakter/merek berhak cipta)',
+      '- Tema visual: ' + TEMA_DESK[tema] + '.',
+      '- Layar judul menarik (judul besar, maskot emoji, tombol "MAIN" besar yang berdenyut), lalu layar permainan, lalu layar hasil.',
+      '- Animasi hidup: latar bergerak (awan/bintang/gelembung), tombol membal saat ditekan, elemen muncul dengan efek pop/slide, maskot bereaksi (senang saat benar, sedih saat salah), efek partikel/konfeti saat benar beruntun, getar layar singkat saat salah.',
+      '- Sistem permainan: poin dan koin yang terlihat naik, combo/streak beruntun dengan teks besar ("COMBO x3!"), bar kemajuan bergaya level, nyawa/hati bila cocok dengan mekaniknya, hitung mundur yang terasa mendesak.',
+      '- Desain mobile-first: muat di layar ponsel 360px tanpa gulir mendatar, tombol minimal 44px, teks minimal 16px, bisa dimainkan dengan ketukan jari; dukung juga papan ketik/mouse di komputer.',
+      '- Semua grafis dibuat dari CSS, SVG inline, canvas, dan emoji (tanpa gambar atau font dari internet).',
+      '',
+      '## SUARA (WAJIB — musik latar khusus game ini + efek)',
+      '- Pakai helper "Suara" di bawah (salin apa adanya). Mulai musik latar SETELAH ketukan pertama pemain (aturan browser): Suara.musik(' + musik + ').',
+      '- Nuansa musik: tempo ' + b[0] + ' BPM, tangga nada ' + (SKALA_NAMA[b[2]] || b[2]) + '. Gunakan PERSIS parameter di atas agar musik game ini khas dan berbeda dari game lain.',
+      '- Efek: Suara.klik() saat menekan tombol, Suara.benar() saat benar, Suara.salah() saat salah, Suara.menang() di layar hasil. Hentikan musik di layar hasil (Suara.berhenti()).',
+      '- Sediakan tombol bisu 🔊/🔇 yang selalu terlihat (Suara.bisu(true/false)).',
+      '',
+      '## ATURAN TEKNIS',
+      '- SATU berkas HTML mandiri: CSS dan JavaScript di dalamnya. DILARANG memakai pustaka/CDN/gambar/font eksternal, fetch/XMLHttpRequest/WebSocket, localStorage/sessionStorage/cookie, alert/confirm/prompt, atau eval.',
+      '- Tidak ada kunci jawaban yang bisa dilihat siswa lewat tampilan (jangan cetak jawaban benar sebelum waktunya).',
+      '- Kode rapi, tanpa variabel global yang bentrok, dan seluruh interaksi diuji secara mental sampai selesai (permainan selalu bisa diselesaikan dan memanggil EduGame.finish).',
+      '',
+      '## INTEGRASI DENGAN APLIKASI GURU (WAJIB — agar nilai dan PERINGKAT siswa tercatat)',
+      'A. Letakkan DUA blok <script> berikut PALING ATAS di dalam <head>, SALIN APA ADANYA tanpa diubah:',
+      '```js',
+      SHIM_JS,
+      '',
+      SUARA_JS,
+      '```',
+      'B. Pemain: panggil EduGame.onInit(function(info){ ... }) — info berisi nama, kelas, avatar, sekolah, guru, judul. Sapa pemain dengan namanya dan LEWATI formulir nama. Jika info.mode === "preview" (sedang dicoba guru/pratinjau AI), pakai nama "Pemain".',
+      'C. Hasil: begitu permainan selesai, panggil EduGame.finish({skor: angka 0–100, benar: jumlah benar, total: jumlah butir}) TEPAT SATU KALI per permainan. skor = persentase penguasaan (bukan poin game).',
+      'D. PERINGKAT (WAJIB ada di layar hasil): sediakan panel "🏆 Papan Peringkat" yang diisi oleh EduGame.onRank(function(rows, me){ ... }). rows = [{rank, nama, kelas, skor}] berisi SELURUH siswa yang memainkan kode game yang sama, urut dari skor tertinggi; me = data pemain ini atau null. Tampilkan minimal 10 teratas dengan medali 🥇🥈🥉 dan sorot baris pemain ini. Data peringkat dikirim aplikasi beberapa detik setelah EduGame.finish; tampilkan teks "Menghitung peringkat…" sampai data tiba. Jika info.mode === "preview", isi panel dengan 5 nama fiktif contoh + skor pemain agar tampilan terlihat.',
+      '',
+      '## PEMERIKSAAN AKHIR SEBELUM MENJAWAB',
+      'Pastikan: (1) satu blok ```html utuh dan tertutup; (2) shim EduGame + helper Suara ada di <head>; (3) ' + n + ' butir lengkap; (4) EduGame.finish dipanggil sekali di akhir; (5) panel peringkat memakai EduGame.onRank; (6) tidak ada sumber eksternal; (7) musik dimulai setelah ketukan pertama; (8) tidak ada teks "contoh"/"isi di sini".',
+      'Sekarang buat game-nya.'
     ].filter(function (x, i, a) { return x !== '' || a[i - 1] !== ''; }).join('\n');
   }
 
@@ -298,6 +455,6 @@
 
   if (window.Art && Art.setEmoji) { var em = {}; CATALOG.forEach(function (x) { em[x.engine] = x.emoji; }); Art.setEmoji(em); }
   window.Content = { KELAS: KELAS, MAPEL: MAPEL, KATEGORI: KATEGORI, CATALOG: CATALOG, ENGINE_INFO: ENGINE_INFO, TIPE: TIPE, parseAI: parseAI, konten: konten, jumlahItem: jumlahItem, contoh: contoh,
-    susunTP: susunTP, susunUnsur: susunUnsur, ringkasUnsur: ringkasUnsur, buatPrompt: buatPrompt, jumlahButir: jumlahButir, daftarKelasSiswa: daftarKelasSiswa,
+    susunTP: susunTP, susunUnsur: susunUnsur, ringkasUnsur: ringkasUnsur, buatPrompt: buatPromptJson, buatPromptJson: buatPromptJson, buatPromptHtml: buatPromptHtml, BGM: BGM, TEMA: TEMA, TEMA_DESK: TEMA_DESK, SUARA_JS: SUARA_JS, SHIM_JS: SHIM_JS, jumlahButir: jumlahButir, daftarKelasSiswa: daftarKelasSiswa,
     nilai: nilai, sembunyi: sembunyi, bisaDisembunyi: bisaDisembunyi, sama: sama, normJ: normJ, gabungKatalog: gabungKatalog };
 })();

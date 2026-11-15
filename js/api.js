@@ -30,7 +30,7 @@
 
   /* ---------- panggilan live ---------- */
   var inflight = {}, epoch = 0;
-  var READ_PUB = /^(pub\.boot|pub\.game|auth\.config|ping)$/;
+  var READ_PUB = /^(pub\.boot|pub\.game|pub\.rank|auth\.config|ping)$/;
   var READ_ALL = /^(me|guru\.dashboard|guru\.games|game\.get|hasil\.list|admin\.overview|admin\.guru|rahasia\.status|system\.status|konten\.validasi|batch)$/;
 
   function fetchJson(url, opt, ms) {
@@ -153,6 +153,14 @@
       for (var i = 0; i < 30; i++) { var k = dasar + '-' + (100 + Math.floor(Math.random() * 900)); if (!d.games.some(function (g) { return g.kode === k; })) return k; }
       return dasar + '-' + Date.now().toString(36).toUpperCase().slice(-4);
     }
+    function rankDemo(d, g, nama, kelas) {
+      var best = {};
+      d.hasil.filter(function (h) { return h.id_permainan === g.id; }).forEach(function (h) { var k = (h.nama + '|' + h.kelas).toLowerCase(), b = best[k]; if (!b || h.skor > b.skor || (h.skor === b.skor && h.durasi < b.durasi)) best[k] = h; });
+      var list = Object.keys(best).map(function (k) { return best[k]; }).sort(function (a, b) { return (b.skor - a.skor) || (a.durasi - b.durasi) || String(a.tanggal).localeCompare(String(b.tanggal)); });
+      var me = null, key = ((nama || '') + '|' + (kelas || '')).toLowerCase();
+      list.forEach(function (h, i) { if ((h.nama + '|' + h.kelas).toLowerCase() === key) me = { rank: i + 1, nama: h.nama, kelas: h.kelas, skor: h.skor, durasi: h.durasi }; });
+      return { total: list.length, top: list.slice(0, 50).map(function (h, i) { return { rank: i + 1, nama: h.nama, kelas: h.kelas, skor: h.skor, durasi: h.durasi }; }), me: me };
+    }
     function milik(d, s) { return d.games.filter(function (g) { return g.email_guru === s.me.email && g.status !== 'dihapus'; }); }
 
     function handle(action, data, sesi) {
@@ -175,9 +183,15 @@
           var kode = String(data.kode || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
           var g = d.games.filter(function (x) { return x.kode === kode && x.status === 'aktif'; })[0];
           if (!g) return fail('Kode permainan tidak ditemukan atau sudah ditutup.', { code: 'NOT_FOUND' });
-          var o = ringan(g, d); var kn = JSON.parse(JSON.stringify(g.konten)); o.guru = (d.guru.filter(function (x) { return x.email === g.email_guru; })[0] || {}).nama || '';
+          var o = ringan(g, d); var kn = JSON.parse(JSON.stringify(g.konten)); o.guru = g.namaGuru || (d.guru.filter(function (x) { return x.email === g.email_guru; })[0] || {}).nama || '';
           if (g.asesmen === 'sumatif' && Content.bisaDisembunyi(g.engine)) { kn = Content.sembunyi(g.engine, kn); o.kunciTersembunyi = true; }
           o.konten = kn; delete o.siswa; delete o.rata; delete o.tuntas; return ok(o);
+        }
+        case 'pub.rank': {
+          var gr = d.games.filter(function (x) { return x.kode === String(data.kode || '').toUpperCase() && x.status !== 'dihapus'; })[0];
+          if (!gr) return fail('Permainan tidak ditemukan.', { code: 'NOT_FOUND' });
+          var rr = rankDemo(d, gr, '', ''); var me2 = data.nama ? rankDemo(d, gr, data.nama, data.kelas).me : null;
+          return ok({ total: rr.total, top: rr.top, me: me2, judul: gr.judul });
         }
         case 'pub.submit': {
           var gm = d.games.filter(function (x) { return x.kode === String(data.kode || '').toUpperCase() && x.status === 'aktif'; })[0];
@@ -194,7 +208,7 @@
           if (!hasil.length) return fail('Nama peserta wajib diisi.');
           save(d);
           var sk = hasil[0].skor;
-          return ok({ hasil: hasil, umpan: sk >= 90 ? 'Luar biasa! Pemahamanmu sangat kuat.' : sk >= 75 ? 'Bagus sekali! Kamu sudah menguasai materi ini.' : sk >= 60 ? 'Cukup baik. Pelajari lagi bagian yang masih salah, ya.' : 'Jangan menyerah! Coba ulangi dan baca materinya sekali lagi.' }, 'Nilai tercatat.');
+          return ok({ hasil: hasil, rank: rankDemo(d, gm, hasil[0].nama, (data.peserta[0] || {}).kelas), umpan: sk >= 90 ? 'Luar biasa! Pemahamanmu sangat kuat.' : sk >= 75 ? 'Bagus sekali! Kamu sudah menguasai materi ini.' : sk >= 60 ? 'Cukup baik. Pelajari lagi bagian yang masih salah, ya.' : 'Jangan menyerah! Coba ulangi dan baca materinya sekali lagi.' }, 'Nilai tercatat.');
         }
         case 'guru.dashboard': {
           var mine = milik(d, sesi), ids = {}; mine.forEach(function (g) { ids[g.id] = 1; });
@@ -212,11 +226,11 @@
         case 'guru.games': return ok(milik(d, sesi).slice().reverse().map(function (g) { return ringan(g, d); }));
         case 'game.create': {
           var m = data.meta || {}, kn;
-          try { kn = Content.konten(m.engine, data.konten); } catch (e) { return fail(e.message); }
+          try { kn = Content.konten(m.engine, m.engine === 'html' ? { html: data.html } : data.konten); } catch (e) { return fail(e.message); }
           if (!String(m.judul || '').trim()) return fail('Judul permainan wajib diisi.');
           var rec = { id: uid('p'), kode: kodeBaru(d, m.materi), email_guru: sesi.me.email, judul: String(m.judul).slice(0, 140), jenjang: m.jenjang === 'SMP' ? 'SMP' : 'SD', fase: m.fase || '', kelas: String(m.kelas || ''),
             mapel: m.mapel || '', materi: m.materi || '', asesmen: m.asesmen === 'sumatif' ? 'sumatif' : 'formatif', engine: m.engine, templateId: m.templateId || '', durasi: Math.min(60, Math.max(5, Number(m.durasi) || 15)),
-            mode: m.mode === 'kelompok' ? 'kelompok' : 'individu', tingkat: m.tingkat || 'sedang', tujuan: m.tujuan || '', unsurPd: m.unsurPd || '', tgl: iso(), status: 'aktif', konten: kn };
+            mode: m.mode === 'kelompok' ? 'kelompok' : 'individu', tingkat: m.tingkat || 'sedang', tujuan: m.tujuan || '', unsurPd: m.unsurPd || '', tgl: iso(), status: 'aktif', sekolah: String(m.sekolah || ''), namaGuru: String(m.namaGuru || ''), bentuk: m.bentuk === 'narasi' ? 'narasi' : 'singkat', sumber: String(m.sumber || ''), konten: kn };
           d.games.push(rec); save(d); return ok({ id: rec.id, kode: rec.kode }, 'Permainan dibuat.');
         }
         case 'game.get': {

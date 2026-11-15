@@ -6,8 +6,20 @@
   'use strict';
   var $ = UI.$, $$ = UI.$$, ic = UI.ic, esc = UI.esc, P = App.Pages;
   var KKM = 70;
-  var ENG_COLOR = { kuis: '#1E40AF', tts: '#7C3AED', kartu: '#0891B2', duel: '#DC2626', balok: '#059669', labirin: '#9333EA' };
+  var ENG_COLOR = { html: '#7C3AED', kuis: '#1E40AF', tts: '#7C3AED', kartu: '#0891B2', duel: '#DC2626', balok: '#059669', labirin: '#9333EA' };
   function einfo(e) { return Content.ENGINE_INFO[e] || Content.ENGINE_INFO.kuis; }
+
+  function metaDari(S) {
+    var k = Content.KELAS.filter(function (x) { return x.v === S.kelasV; })[0] || Content.KELAS[3], info = einfo(S.engine);
+    var m = { jenjang: k.jenjang, kelas: k.kelas, fase: k.fase, mapel: S.mapel, materi: S.materi, asesmen: S.asesmen, mode: S.engine === 'duel' ? 'kelompok' : S.mode, durasi: S.durasi, tingkat: S.tingkat, engine: S.engine, templateId: S.templateId, sekolah: S.sekolah || '', namaGuru: S.namaGuru || '', bentuk: S.bentuk || 'singkat' };
+    m.judul = (S.judul || (info.nama.split(' ').slice(0, 2).join(' ') + ': ' + S.materi)).slice(0, 140);
+    m.tujuan = S.tujuan || Content.susunTP(m); m.unsur = Content.susunUnsur(m); m.unsurPd = Content.ringkasUnsur(m.unsur);
+    return m;
+  }
+  function simpanProfil(S) {
+    var me = App.me(); if (!me || me.darurat || !Api.LIVE) return;
+    if (S.sekolah || S.namaGuru) Api.call('guru.profil', { nama: S.namaGuru || me.nama, instansi: S.sekolah || me.instansi }).then(function (r) { if (r.success) { var s = Api.Sesi.get(); if (s && s.me) { s.me.nama = r.data.nama; s.me.instansi = r.data.instansi; Api.Sesi.set(s); } } });
+  }
   function stat(g) { return g.status === 'aktif' ? '<span class="st st-on">● Aktif</span>' : '<span class="st st-off">● ' + (g.status === 'draft' ? 'Draft' : 'Nonaktif') + '</span>'; }
   function metric(icn, cls, label, value, foot, tag) {
     return '<div class="metric card-fx shine" data-reveal><div class="m-top"><span class="m-ic ' + cls + '">' + ic(icn, 22) + '</span>' + (tag ? '<span class="tag">' + tag + '</span>' : '') + '</div><span class="m-l">' + label + '</span><b class="m-v">' + value + '</b><span class="m-f">' + foot + '</span></div>';
@@ -73,19 +85,17 @@
     if (!S.kelasV) S.kelasV = 'SD-4';
     if (!S.asesmen) S.asesmen = 'formatif';
     if (!S.mode) S.mode = 'individu';
+    if (!S.bentuk) S.bentuk = 'singkat';
+    var me0 = App.me() || {};
+    if (S.sekolah === undefined) S.sekolah = me0.instansi || Api.lsGet('edugame_sekolah', '') || '';
+    if (S.namaGuru === undefined) S.namaGuru = me0.nama || '';
     if (!S.durasi) S.durasi = 15;
     if (!S.tingkat) S.tingkat = 'sedang';
     var tpls = Content.gabungKatalog(App.templat).filter(function (t) { return t.status !== 'arsip'; });
     if (!S.templateId && tpls[0]) { S.templateId = tpls[0].id; S.engine = tpls[0].engine; S.dipilih = false; }
     var tplSel = tpls.filter(function (t) { return t.id === S.templateId; })[0]; if (tplSel) S.engine = tplSel.engine;
     function kelasInfo() { return Content.KELAS.filter(function (k) { return k.v === S.kelasV; })[0] || Content.KELAS[3]; }
-    function meta() {
-      var k = kelasInfo(), info = einfo(S.engine);
-      var m = { jenjang: k.jenjang, kelas: k.kelas, fase: k.fase, mapel: S.mapel, materi: S.materi, asesmen: S.asesmen, mode: S.engine === 'duel' ? 'kelompok' : S.mode, durasi: S.durasi, tingkat: S.tingkat, engine: S.engine, templateId: S.templateId };
-      m.judul = (S.judul || (info.nama.split(' ').slice(0, 2).join(' ') + ': ' + S.materi)).slice(0, 140);
-      m.tujuan = S.tujuan || Content.susunTP(m); m.unsur = Content.susunUnsur(m); m.unsurPd = Content.ringkasUnsur(m.unsur);
-      return m;
-    }
+    function meta() { return metaDari(S); }
     function simpan() { App.draft(S); }
     var c;
     function render() {
@@ -99,11 +109,14 @@
     function step1or2() {
       var k = kelasInfo(), body = $('#stepbody', c), m = meta();
       if (S.step === 1) {
-        body.innerHTML = '<form class="card pad" id="f1"><h2 class="h-sec"><i></i> 1. Identitas Pembelajaran</h2><p class="muted">Parameter kurikulum disesuaikan otomatis dengan Kurikulum Merdeka.</p><div class="grid-2f"><label class="lbl">Jenjang & Fase *<select id="kv" class="inp">' + Content.KELAS.map(function (x) { return '<option value="' + x.v + '"' + (x.v === S.kelasV ? ' selected' : '') + '>' + x.label + '</option>'; }).join('') + '</select></label><label class="lbl">Mata Pelajaran *<select id="mp" class="inp">' + Content.MAPEL[k.jenjang].map(function (x) { return '<option' + (x === S.mapel ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label></div>' +
+        body.innerHTML = '<form class="card pad" id="f1"><h2 class="h-sec"><i></i> 1. Identitas Pembelajaran</h2><p class="muted">Parameter kurikulum disesuaikan otomatis dengan Kurikulum Merdeka.</p><div class="grid-2f"><label class="lbl">Nama Sekolah *<input id="sk" class="inp" maxlength="120" required autocomplete="organization" value="' + esc(S.sekolah || '') + '" placeholder="Contoh: SDN 1 Tanjungpinang"></label><label class="lbl">Nama Guru *<input id="gr" class="inp" maxlength="80" required autocomplete="name" value="' + esc(S.namaGuru || '') + '" placeholder="Contoh: Ibu Rahmawati, S.Pd"></label></div><div class="grid-2f"><label class="lbl">Jenjang & Fase *<select id="kv" class="inp">' + Content.KELAS.map(function (x) { return '<option value="' + x.v + '"' + (x.v === S.kelasV ? ' selected' : '') + '>' + x.label + '</option>'; }).join('') + '</select></label><label class="lbl">Mata Pelajaran *<select id="mp" class="inp">' + Content.MAPEL[k.jenjang].map(function (x) { return '<option' + (x === S.mapel ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label></div>' +
           '<label class="lbl">Topik / Pokok Bahasan *<input id="tp" class="inp" maxlength="120" required value="' + esc(S.materi || '') + '" placeholder="Contoh: Bagian tubuh tumbuhan dan fungsinya"></label>' +
           '<div class="lbl">Tipe Asesmen Kelas</div><div class="radios"><label class="radio' + (S.asesmen === 'formatif' ? ' on' : '') + '"><input type="radio" name="as" value="formatif"' + (S.asesmen === 'formatif' ? ' checked' : '') + '><div><b>Formatif (Latihan Interaktif)</b><small>Umpan balik langsung & remedi saat jam ajar</small></div></label><label class="radio' + (S.asesmen === 'sumatif' ? ' on' : '') + '"><input type="radio" name="as" value="sumatif"' + (S.asesmen === 'sumatif' ? ' checked' : '') + '><div><b>Sumatif (Ulangan Harian)</b><small>Skor formal tanpa bocoran kunci di awal</small></div></label></div>' +
           '<div class="auto-box" id="auto"></div><div class="form-act"><span></span><button class="btn btn-primary btn-lg glow shine" type="submit">Lanjut: Karakteristik & Jenis ' + ic('arrow', 20) + '</button></div></form>';
         var kv = $('#kv', body), mp = $('#mp', body), tpc = $('#tp', body);
+        var sk = $('#sk', body), gr = $('#gr', body);
+        sk.addEventListener('input', function () { S.sekolah = sk.value.trim(); simpan(); });
+        gr.addEventListener('input', function () { S.namaGuru = gr.value.trim(); simpan(); });
         function auto() { S.kelasV = kv.value; S.mapel = mp.value; S.materi = tpc.value.trim(); S.asesmen = ($('input[name=as]:checked', body) || {}).value || 'formatif'; var mm = meta(); if (!S.tujuanManual) S.tujuan = Content.susunTP(mm); mm = meta();
           $('#auto', body).innerHTML = '<div class="auto-h">' + ic('sparkles', 18) + ' DISUSUN OTOMATIS OLEH ' + esc(App.appName().toUpperCase()) + '</div><div class="grid-2f"><div><small class="lbl-s">CAPAIAN & TUJUAN PEMBELAJARAN (TP) — bisa Anda ubah</small><textarea id="tj" class="inp" rows="4" maxlength="500">' + esc(S.tujuan) + '</textarea></div><div><small class="lbl-s">UNSUR PEMBELAJARAN MENDALAM</small><div class="chips">' + mm.unsur.prinsip.map(function (x) { return '<span class="chip">' + esc(x.split(':')[0]) + '</span>'; }).join('') + '</div><small class="lbl-s">DIMENSI PROFIL</small><div class="chips">' + mm.unsur.dimensi.map(function (x) { return '<span class="chip chip-y">' + esc(x) + '</span>'; }).join('') + '</div></div></div>';
           $('#tj', body).addEventListener('input', function (e) { S.tujuan = e.target.value; S.tujuanManual = true; simpan(); }); simpan(); }
@@ -111,7 +124,7 @@
         mp.addEventListener('change', auto); tpc.addEventListener('input', UI.debounce(function () { S.tujuanManual = false; auto(); }, 250));
         $$('input[name=as]', body).forEach(function (r) { r.addEventListener('change', function () { $$('.radio', body).forEach(function (l) { l.classList.toggle('on', l.querySelector('input').checked); }); S.tujuanManual = false; auto(); }); });
         if (!S.mapel) S.mapel = mp.value; mp.value = S.mapel; auto();
-        $('#f1', body).addEventListener('submit', function (e) { e.preventDefault(); auto(); if (!S.materi) { UI.toast('Topik wajib diisi.', 'err'); return; } S.step = 2; render(); });
+        $('#f1', body).addEventListener('submit', function (e) { e.preventDefault(); auto(); S.sekolah = sk.value.trim(); S.namaGuru = gr.value.trim(); if (!S.sekolah || !S.namaGuru) { UI.toast('Nama sekolah dan nama guru wajib diisi.', 'err'); return; } Api.lsSet('edugame_sekolah', S.sekolah); if (!S.materi) { UI.toast('Topik wajib diisi.', 'err'); return; } S.step = 2; render(); });
       } else {
         if (!S.dipilih) S.phase = 'pilih'; else if (!S.phase) S.phase = 'atur';
         if (S.phase === 'pilih') pilihGame(body, k); else aturGame(body, k, m);
@@ -149,6 +162,11 @@
       body.innerHTML = '<div class="sel-g card" style="--c:' + (t.warna || info.warna) + '"><div class="sel-media" id="sm">' + Art.gambarTemplat(t).map(function (u) { return '<img class="slide" src="' + esc(u) + '" alt="">'; }).join('') + '<div class="dots"></div></div><div class="sel-body"><button class="btn btn-soft btn-sm" id="ganti">' + ic('back', 16) + ' Ganti Game</button><span class="eng-k">' + esc(katLabel(info.kat)) + '</span><h2>' + esc(t.nama) + '</h2><p class="muted">' + esc(t.deskripsi) + '</p><ul class="ticks">' + info.ciri.map(function (x) { return '<li>' + ic('check', 14) + esc(x) + '</li>'; }).join('') + '</ul><div class="chips"><span class="pill' + (cocok ? '' : ' pill-mute') + '">' + (cocok ? 'Cocok untuk Fase ' + k.fase : 'Dirancang untuk Fase ' + String(t.fase).replace(/,/g, '/')) + '</span><span class="pill">' + dmin + '–' + dmax + ' menit</span></div></div></div>' +
         '<div class="card pad"><h2 class="h-sec"><i class="v"></i> Pengaturan Permainan</h2><label class="lbl">Judul permainan<input id="jd" class="inp" maxlength="140" value="' + esc(m.judul) + '"></label><div class="grid-3f"><div><div class="lbl">Mode bermain</div><div class="seg" id="seg-m"><button type="button" data-v="individu" class="' + (m.mode === 'individu' ? 'on' : '') + '"' + (S.engine === 'duel' ? ' disabled' : '') + '>' + ic('user', 16) + ' Individu</button><button type="button" data-v="kelompok" class="' + (m.mode === 'kelompok' ? 'on' : '') + '">' + ic('users', 16) + ' Kelompok</button></div>' + (S.engine === 'duel' ? '<small class="muted">Duel selalu berkelompok.</small>' : '') + '</div><div><div class="lbl">Durasi sesi <b class="pill" id="dv">' + S.durasi + ' Menit</b></div><input type="range" id="dr" min="' + dmin + '" max="' + dmax + '" step="1" value="' + S.durasi + '"><div class="range-l"><span>' + dmin + ' mnt</span><span>' + dmax + ' mnt</span></div></div><div><div class="lbl">Tingkat kesulitan</div><div class="seg" id="seg-t">' + [['mudah', 'Mudah'], ['sedang', 'Sedang'], ['bertingkat', 'Bertingkat']].map(function (x) { return '<button type="button" data-v="' + x[0] + '" class="' + (S.tingkat === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div></div></div></div>' +
         '<div class="sticky-bar"><button class="btn btn-outline" id="b0">' + ic('back', 18) + ' Pilih Game Lain</button><button class="btn btn-ghost" id="b1">Identitas</button><button class="btn btn-soft" id="bp">' + ic('copy', 18) + ' Salin Prompt untuk AI</button><button class="btn btn-accent btn-lg glow shine" id="bg">' + ic('bolt', 18) + ' Buat Game Langsung ' + ic('arrow', 18) + '</button></div>';
+      var tp = (Content.ENGINE_INFO[S.engine] || {}).tipe, adaNarasi = ['questions', 'statements', 'items', 'problems'].indexOf(tp) > -1;
+      $('.card.pad', body).insertAdjacentHTML('beforeend', '<div class="bentuk"><div class="lbl">Bentuk soal</div><div class="seg" id="seg-b"><button type="button" data-v="singkat" class="' + (S.bentuk === 'singkat' ? 'on' : '') + '">⚡ Persoalan singkat</button><button type="button" data-v="narasi" class="' + (S.bentuk === 'narasi' ? 'on' : '') + '">📖 Narasi / analisis</button></div><small class="muted" id="bt-n"></small></div>');
+      function noteBentuk() { $('#bt-n', body).textContent = (S.bentuk === 'narasi' ? 'Setiap butir diawali teks bacaan, kasus, atau data lalu pertanyaan bernalar — mengasah kemampuan analisis siswa.' : 'Satu konsep per butir dengan kalimat langsung — cepat, ringan, cocok untuk latihan harian.') + (adaNarasi ? '' : ' (Pada jenis game ini bentuk narasi berlaku saat dibuat lewat prompt "Game langsung jadi".)'); }
+      noteBentuk();
+      $$('#seg-b button', body).forEach(function (b) { b.addEventListener('click', function () { S.bentuk = b.getAttribute('data-v'); $$('#seg-b button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); noteBentuk(); simpan(); }); });
       UI.bind(body); UI.rotator($('#sm', body), { slideSel: '.slide', dots: '.dots', ms: 3000 });
       function kembaliKeDaftar() { S.phase = 'pilih'; simpan(); render(); window.scrollTo(0, 0); }
       $('#ganti', body).addEventListener('click', kembaliKeDaftar); $('#b0', body).addEventListener('click', kembaliKeDaftar);
@@ -157,7 +175,7 @@
       $$('#seg-m button', body).forEach(function (b) { b.addEventListener('click', function () { S.mode = b.getAttribute('data-v'); $$('#seg-m button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); simpan(); }); });
       $$('#seg-t button', body).forEach(function (b) { b.addEventListener('click', function () { S.tingkat = b.getAttribute('data-v'); $$('#seg-t button', body).forEach(function (x) { x.classList.toggle('on', x === b); }); simpan(); }); });
       $('#dr', body).addEventListener('input', function (e) { S.durasi = +e.target.value; $('#dv', body).textContent = S.durasi + ' Menit'; simpan(); });
-      $('#bp', body).addEventListener('click', function () { var mm = meta(); S.prompt = Content.buatPrompt(mm); S.promptSaved = false; simpan(); App.go('/guru/prompt'); });
+      $('#bp', body).addEventListener('click', function () { var mm = meta(); S.promptHtml = Content.buatPromptHtml(mm); S.promptJson = Content.buatPromptJson(mm); S.promptSaved = false; S.pmode = 'html'; simpan(); App.go('/guru/prompt'); });
       $('#bg', body).addEventListener('click', langsung);
     }
     function langsung() {
@@ -171,15 +189,15 @@
     }
     function sediaModal(mm, prompt, msg) {
       var b = document.createElement('div');
-      b.innerHTML = '<p>' + esc(msg) + '</p><div class="opt-cards"><button class="opt-c" id="o1"><b>' + ic('copy', 18) + ' Salin Prompt & Impor Hasil</b><small>Cara utama: tempel prompt ke ChatGPT, Gemini, atau Claude, lalu impor balasannya ke sini.</small></button><button class="opt-c" id="o2"><b>' + ic('play', 18) + ' Coba dengan konten contoh</b><small>Membuat game dari contoh bawaan (topik bagian tubuh tumbuhan) untuk mencoba tampilan. Isi soal TIDAK sesuai topik Anda.</small></button></div>';
+      b.innerHTML = '<p>' + esc(msg) + '</p><div class="opt-cards"><button class="opt-c" id="o1"><b>' + ic('copy', 18) + ' Salin Prompt (game langsung jadi)</b><small>Cara utama: tempel prompt ke ChatGPT, Gemini, atau Claude — AI langsung membuat game yang bisa dimainkan. Salin kodenya ke sini untuk diterbitkan.</small></button><button class="opt-c" id="o2"><b>' + ic('play', 18) + ' Coba dengan konten contoh</b><small>Membuat game dari contoh bawaan (topik bagian tubuh tumbuhan) untuk mencoba tampilan. Isi soal TIDAK sesuai topik Anda.</small></button></div>';
       var m = UI.modal({ title: 'Pembuatan otomatis belum aktif', body: b });
-      $('#o1', b).addEventListener('click', function () { m.close(); S.prompt = prompt; S.promptSaved = false; simpan(); App.go('/guru/prompt'); });
+      $('#o1', b).addEventListener('click', function () { m.close(); var mx = meta(); S.promptHtml = Content.buatPromptHtml(mx); S.promptJson = Content.buatPromptJson(mx); S.promptSaved = false; S.pmode = 'html'; simpan(); App.go('/guru/prompt'); });
       $('#o2', b).addEventListener('click', function () { m.close(); Pages_.buatGame(mm, Content.contoh(mm.engine)); });
     }
     function simpanPrompt(isi, opsi) { Api.call('prompt.simpan', { isi: isi, opsi: opsi }); }
     var Pages_ = { buatGame: function (mm, konten, done) {
       return Api.call('game.create', { meta: mm, konten: konten, tautanDasar: App.baseUrl() }).then(function (r) {
-        if (r.success) { App.draft(null); UI.toast('Permainan berhasil dibuat!'); App.go('/guru/hasil/' + r.data.id); } else UI.toast(r.message, 'err', 6000);
+        if (r.success) { simpanProfil(S); App.draft(null); UI.toast('Permainan berhasil dibuat!'); App.go('/guru/hasil/' + r.data.id); } else UI.toast(r.message, 'err', 6000);
         return r;
       });
     } };
@@ -192,47 +210,89 @@
   P.prompt = function (p, ok) {
     if (!App.requireLogin()) return;
     var S = App.draft();
-    if (!S.prompt) { App.go('/guru/buat'); return; }
-    if (!S.promptSaved) { S.promptSaved = true; App.draft(S); Api.call('prompt.simpan', { isi: S.prompt, opsi: 'salin' }); }
-    var mm = P._metaFrom ? null : null, eng = S.engine || 'kuis';
-    var c = App.panel('guru', 'buat', '<div class="stepper"><div class="stp done"><span>' + ic('check', 18) + '</span><div><small>LANGKAH 1 • SELESAI</small><b>Identitas & Capaian</b></div></div><div class="stp done"><span>' + ic('check', 18) + '</span><div><small>LANGKAH 2 • SELESAI</small><b>Karakteristik & Mekanik</b></div></div><div class="stp on"><span>3</span><div><small>LANGKAH 3 • AKTIF</small><b>Hasil Salin Prompt AI</b></div></div></div>' +
-      '<div class="page-h"><div><h1>Prompt AI Siap Digunakan ✨</h1><p>Salin prompt ini ke ChatGPT, Gemini, Claude, atau AI favorit Anda untuk mendapatkan konten game secara instan.</p></div><div class="page-act"><a class="btn btn-outline" href="#/guru/buat" id="ep">' + ic('settings', 18) + ' Edit Parameter</a><button class="btn btn-primary glow shine" id="cp">' + ic('copy', 18) + ' Salin Seluruh Prompt</button></div></div>' +
-      '<div class="grid-main"><section class="card"><div class="term-h"><i></i><i></i><i></i><b>Prompt Pembelajaran Terstruktur</b><span class="pill">' + S.prompt.length.toLocaleString('id-ID') + ' karakter</span></div><pre class="term" id="pt"></pre><div class="term-f"><button class="btn btn-primary" id="cp2">' + ic('copy', 18) + ' Salin Seluruh Prompt ke Clipboard</button><button class="btn btn-outline" id="dl">' + ic('download', 18) + ' Unduh .md</button></div></section>' +
-      '<aside><section class="card pad"><h3 class="h-sm">Cara Menggunakan Prompt</h3><ol class="how"><li><b>Salin prompt</b><span>Klik tombol salin di panel ini.</span></li><li><b>Tempel ke AI favorit</b><span>Buka ChatGPT, Gemini, atau Claude, lalu tempel dan kirim.</span></li><li><b>Impor kembali ke sini</b><span>Salin balasan AI, tempel di kolom bawah, lalu validasi.</span></li></ol></section>' +
-      '<section class="card pad"><h3 class="h-sm">AI yang Dapat Dipakai</h3><div class="ai-list"><a class="ai card-fx shine" href="https://chatgpt.com" target="_blank" rel="noopener"><span class="ai-i g">GPT</span><div><b>ChatGPT</b><small>OpenAI</small></div>' + ic('arrow', 16) + '</a><a class="ai card-fx shine" href="https://gemini.google.com" target="_blank" rel="noopener"><span class="ai-i b">GEM</span><div><b>Google Gemini</b><small>Terintegrasi Google</small></div>' + ic('arrow', 16) + '</a><a class="ai card-fx shine" href="https://claude.ai" target="_blank" rel="noopener"><span class="ai-i o">CLD</span><div><b>Claude</b><small>Anthropic</small></div>' + ic('arrow', 16) + '</a></div></section></aside></div>' +
-      '<section class="card pad" id="imp"><div class="card-h"><div><h2 class="h-sm">' + ic('bolt', 20) + ' Sudah punya jawaban dari AI?</h2><p class="muted">Tempelkan seluruh balasan AI di bawah ini untuk divalidasi dan dijadikan game.</p></div><button class="btn btn-outline btn-sm" id="ex">' + ic('file', 16) + ' Lihat Contoh JSON</button></div><textarea id="ai" class="inp mono" rows="9" placeholder=\'Tempel balasan AI di sini, misalnya: { "meta": {...}, "questions": [...] }\'></textarea><div id="imsg"></div><div class="form-act"><span class="muted">' + ic('checkc', 16) + ' Pembaca otomatis mendukung JSON murni maupun blok kode ```json … ```.</span><span><button class="btn btn-soft" id="cl">Bersihkan</button> <button class="btn btn-primary btn-lg glow shine" id="vb">' + ic('bolt', 18) + ' Validasi & Buat Game</button></span></div></section>');
-    $('#pt', c).textContent = S.prompt;
-    function salin() { UI.salin(S.prompt).then(function (o) { UI.toast(o ? 'Prompt disalin. Tempel ke AI pilihan Anda.' : 'Gagal menyalin otomatis. Blok teks lalu salin manual.', o ? 'ok' : 'err'); }); }
-    $('#cp', c).addEventListener('click', salin); $('#cp2', c).addEventListener('click', salin);
-    $('#dl', c).addEventListener('click', function () { UI.unduh(new Blob([S.prompt], { type: 'text/markdown;charset=utf-8' }), 'prompt-' + eng + '.md'); });
-    $('#cl', c).addEventListener('click', function () { $('#ai', c).value = ''; $('#imsg', c).innerHTML = ''; });
-    $('#ex', c).addEventListener('click', function () {
-      var json = JSON.stringify(Content.contoh(eng), null, 2);
-      var m = UI.modal({ title: 'Contoh format JSON', wide: true, body: '<pre class="term small"></pre>', actions: [{ label: 'Tutup', cls: 'btn-outline', onClick: function (x) { x(); } }, { label: 'Pakai contoh ke kolom impor', cls: 'btn-primary', onClick: function (x) { $('#ai', c).value = json; x(); } }] });
-      $('pre', m.body).textContent = json;
-    });
-    $('#vb', c).addEventListener('click', function () {
-      var raw = $('#ai', c).value.trim(), msg = $('#imsg', c), btn = $('#vb', c);
-      if (!raw) { msg.innerHTML = '<div class="note note-err">Kolom masih kosong. Tempel balasan AI terlebih dahulu.</div>'; return; }
-      var obj; try { obj = Content.parseAI(raw); Content.konten(eng, obj); } catch (e) { msg.innerHTML = '<div class="note note-err">' + ic('x', 18) + '<div><b>Belum valid:</b> ' + esc(e.message) + '<br><small>Minta AI memperbaiki: "Perbaiki JSON agar sesuai format dan kirim ulang HANYA JSON-nya."</small></div></div>'; return; }
-      btn.disabled = true;
-      Api.call('konten.validasi', { engine: eng, konten: obj }).then(function (v) {
-        if (!v.success) { btn.disabled = false; msg.innerHTML = '<div class="note note-err">' + esc(v.message) + '</div>'; return; }
-        var m = P._meta ? null : null;
-        var k = Content.KELAS.filter(function (x) { return x.v === S.kelasV; })[0] || Content.KELAS[3], info = einfo(eng), unsur = Content.susunUnsur({ engine: eng, asesmen: S.asesmen, mode: S.mode });
-        var meta = { jenjang: k.jenjang, kelas: k.kelas, fase: k.fase, mapel: S.mapel, materi: S.materi, asesmen: S.asesmen, mode: eng === 'duel' ? 'kelompok' : S.mode, durasi: S.durasi, tingkat: S.tingkat, engine: eng, templateId: S.templateId, judul: S.judul || (info.nama.split(' ').slice(0, 2).join(' ') + ': ' + S.materi), tujuan: S.tujuan || '', unsurPd: Content.ringkasUnsur(unsur) };
-        Api.call('game.create', { meta: meta, konten: v.data, tautanDasar: App.baseUrl() }).then(function (r) {
-          btn.disabled = false;
-          if (r.success) { App.draft(null); UI.toast('Permainan berhasil dibuat dari hasil AI!'); App.go('/guru/hasil/' + r.data.id); } else msg.innerHTML = '<div class="note note-err">' + esc(r.message) + '</div>';
+    if (!S.promptHtml && !S.promptJson) { App.go('/guru/buat'); return; }
+    var eng = S.engine || 'kuis', info = einfo(eng), mode = S.pmode || 'html';
+    if (!S.promptSaved) { S.promptSaved = true; App.draft(S); Api.call('prompt.simpan', { isi: S.promptHtml || S.promptJson, opsi: 'salin' }); }
+    var steps = '<div class="stepper"><div class="stp done"><span>' + ic('check', 18) + '</span><div><small>LANGKAH 1 • SELESAI</small><b>Identitas & Capaian</b></div></div><div class="stp done"><span>' + ic('check', 18) + '</span><div><small>LANGKAH 2 • SELESAI</small><b>Karakteristik & Mekanik</b></div></div><div class="stp on"><span>3</span><div><small>LANGKAH 3 • AKTIF</small><b>Prompt AI & Terbitkan</b></div></div></div>';
+    var c = App.panel('guru', 'buat', steps +
+      '<div class="page-h"><div><h1>Prompt AI Siap Digunakan ✨</h1><p>Game: <b>' + esc(info.nama) + '</b> • ' + esc(S.materi || '') + '. Pilih cara Anda ingin mendapatkan game-nya.</p></div><div class="page-act"><a class="btn btn-outline" href="#/guru/buat" id="ep">' + ic('settings', 18) + ' Edit Parameter</a></div></div>' +
+      '<div class="tabs2" id="tb"><button type="button" data-m="html" class="on"><b>🎮 Game langsung jadi</b><small>Disarankan — AI membuat game utuh, tanpa JSON</small></button><button type="button" data-m="json"><b>📋 Format data (JSON)</b><small>Untuk 24 mesin bawaan aplikasi</small></button></div><div id="pm"></div>');
+    var AI = '<div class="ai-list"><a class="ai card-fx shine" href="https://chatgpt.com" target="_blank" rel="noopener"><span class="ai-i g">GPT</span><div><b>ChatGPT</b><small>OpenAI</small></div>' + ic('arrow', 16) + '</a><a class="ai card-fx shine" href="https://gemini.google.com" target="_blank" rel="noopener"><span class="ai-i b">GEM</span><div><b>Google Gemini</b><small>Terintegrasi Google</small></div>' + ic('arrow', 16) + '</a><a class="ai card-fx shine" href="https://claude.ai" target="_blank" rel="noopener"><span class="ai-i o">CLD</span><div><b>Claude</b><small>Anthropic</small></div>' + ic('arrow', 16) + '</a></div>';
+    function salin(t) { UI.salin(t).then(function (o) { UI.toast(o ? 'Prompt disalin. Tempel ke AI pilihan Anda lalu tekan Enter.' : 'Gagal menyalin otomatis. Blok teks lalu salin manual.', o ? 'ok' : 'err'); }); }
+    function termina(t, nama) {
+      return '<section class="card"><div class="term-h"><i></i><i></i><i></i><b>' + nama + '</b><span class="pill">' + t.length.toLocaleString('id-ID') + ' karakter</span></div><pre class="term" id="pt"></pre><div class="term-f"><button class="btn btn-primary glow shine" id="cp">' + ic('copy', 18) + ' Salin Seluruh Prompt</button><button class="btn btn-outline" id="dl">' + ic('download', 18) + ' Unduh .md</button></div></section>';
+    }
+    function pasangTerm(t, namaBerkas) { $('#pt', c).textContent = t; $('#cp', c).addEventListener('click', function () { salin(t); }); $('#dl', c).addEventListener('click', function () { UI.unduh(new Blob([t], { type: 'text/markdown;charset=utf-8' }), namaBerkas); }); }
+
+    /* ---------- MODE 1: game HTML langsung jadi ---------- */
+    function tampilHtml() {
+      $('#pm', c).innerHTML = '<div class="grid-main">' + termina(S.promptHtml, 'Prompt: Game Langsung Jadi') + '<aside><section class="card pad"><h3 class="h-sm">Cara memakai (4 langkah)</h3><ol class="how"><li><b>Salin prompt</b><span>Klik Salin Seluruh Prompt.</span></li><li><b>Tempel ke AI lalu tekan Enter</b><span>AI langsung membuat game utuh. Bila AI Anda punya pratinjau (Canvas / Artifacts / Run), game langsung bisa dimainkan di sana.</span></li><li><b>Belum puas? Minta perbaikan</b><span>Contoh: "Buat tampilan lebih meriah", "Perbaiki bug tombol ...". Prompt sudah memuat aturan agar hasilnya kompatibel.</span></li><li><b>Salin kode HTML ke bawah</b><span>Tempel (atau unggah berkas .html), uji coba, lalu terbitkan agar siswa bisa main lewat kode dan peringkat otomatis.</span></li></ol></section><section class="card pad"><h3 class="h-sm">Buka AI favorit</h3>' + AI + '</section></aside></div>' +
+        '<section class="card pad" id="imp"><div class="card-h"><div><h2 class="h-sm">' + ic('bolt', 20) + ' Sudah punya game dari AI?</h2><p class="muted">Tempel seluruh balasan AI (boleh beserta blok ```html) atau unggah berkas .html.</p></div><span class="hbtns"><button type="button" class="btn btn-soft btn-sm" id="hcn">' + ic('sparkles', 16) + ' Muat contoh game</button><label class="btn btn-outline btn-sm" for="hf">' + ic('file', 16) + ' Unggah .html</label></span><input type="file" id="hf" accept=".html,.htm,.txt,text/html" hidden></div><textarea id="hc" class="inp mono" rows="9" placeholder="Tempel kode HTML game di sini…  (<!DOCTYPE html> … </html>)"></textarea><div id="hm"></div><div class="form-act"><span class="muted">' + ic('lock', 16) + ' Game dijalankan di kotak aman: tanpa internet dan tanpa akses ke akun Anda.</span><span><button class="btn btn-soft" id="hcl">Bersihkan</button> <button class="btn btn-outline btn-lg" id="hu" disabled>' + ic('play', 18) + ' Uji Coba</button> <button class="btn btn-primary btn-lg glow shine" id="hp" disabled>' + ic('bolt', 18) + ' Terbitkan Game</button></span></div></section>';
+      pasangTerm(S.promptHtml, 'prompt-game-' + eng + '.md');
+      var ta = $('#hc', c), kode = '', cek = null;
+      function evaluasi() {
+        kode = HtmlGame.bersihkanKode(ta.value); var m = $('#hm', c);
+        if (!ta.value.trim()) { m.innerHTML = ''; $('#hu', c).disabled = $('#hp', c).disabled = true; return; }
+        cek = HtmlGame.periksa(kode);
+        m.innerHTML = (cek.ok ? '<div class="note">' + ic('checkc', 18) + '<div><b>Kode terbaca.</b> ' + UI.fmtNum(kode.length) + ' karakter.</div></div>' : '') + cek.msg.map(function (x) { return '<div class="note note-err">' + ic('x', 18) + '<div>' + esc(x) + '</div></div>'; }).join('') + cek.warn.map(function (x) { return '<div class="note note-warn">' + ic('bell', 18) + '<div>' + esc(x) + '</div></div>'; }).join('');
+        $('#hu', c).disabled = $('#hp', c).disabled = !cek.ok;
+      }
+      ta.addEventListener('input', UI.debounce(evaluasi, 200));
+      $('#hf', c).addEventListener('change', function (e) { var f = e.target.files[0]; if (!f) return; if (f.size > 600000) { UI.toast('Berkas terlalu besar.', 'err'); return; } var r = new FileReader(); r.onload = function () { ta.value = String(r.result); evaluasi(); }; r.readAsText(f); });
+      $('#hcl', c).addEventListener('click', function () { ta.value = ''; evaluasi(); });
+      $('#hcn', c).addEventListener('click', function () { ta.value = ContohGame.buat(); evaluasi(); UI.toast('Contoh game dimuat. Klik Uji Coba untuk memainkannya.'); });
+      $('#hu', c).addEventListener('click', function () {
+        evaluasi(); if (!cek.ok) return;
+        var m0 = metaDari(S), gm = { judul: m0.judul, kode: 'UJI-COBA', sekolah: S.sekolah || '', guru: S.namaGuru || '', konten: { html: kode } }, h = null, host = document.createElement('div');
+        var m = UI.modal({ title: 'Uji Coba Game (tidak disimpan)', wide: true, body: host, onClose: function () { if (h) h.destroy(); }, actions: [{ label: 'Tutup', cls: 'btn-outline', onClick: function (x) { x(); } }, { label: 'Terbitkan Game', cls: 'btn-primary', onClick: function (x) { x(); terbit(); } }] });
+        h = HtmlGame.mount(host, gm, { nama: 'Guru (uji coba)', kelas: '-', avatar: '🧑‍🏫' }, { preview: true, onQuit: function () { m.close(); } });
+      });
+      function terbit() {
+        evaluasi(); if (!cek.ok) return; var b = $('#hp', c); b.disabled = true;
+        var m0 = metaDari(S); m0.sumber = eng; m0.engine = 'html';
+        Api.call('game.create', { meta: m0, html: kode, tautanDasar: App.baseUrl() }).then(function (r) {
+          b.disabled = false;
+          if (r.success) { simpanProfil(S); App.draft(null); UI.toast('Game berhasil diterbitkan!'); App.go('/guru/hasil/' + r.data.id); } else $('#hm', c).insertAdjacentHTML('beforeend', '<div class="note note-err">' + esc(r.message) + '</div>');
+        });
+      }
+      $('#hp', c).addEventListener('click', terbit);
+    }
+
+    /* ---------- MODE 2: format data (JSON) untuk mesin bawaan ---------- */
+    function tampilJson() {
+      $('#pm', c).innerHTML = '<div class="note">' + ic('bulb', 18) + '<div>Mode ini meminta AI mengisi <b>data</b> (JSON) yang lalu dimainkan oleh salah satu dari 24 mesin bawaan aplikasi. Lebih ringan, tetapi Anda perlu menempel balasan JSON. Untuk hasil langsung jadi, gunakan tab <b>Game langsung jadi</b>.</div></div><div class="grid-main">' + termina(S.promptJson, 'Prompt: Format Data (JSON)') + '<aside><section class="card pad"><h3 class="h-sm">Cara memakai</h3><ol class="how"><li><b>Salin prompt</b><span>Tempel ke AI favorit Anda.</span></li><li><b>Salin balasan JSON</b><span>Aplikasi memahami JSON murni maupun blok ```json.</span></li><li><b>Impor di bawah</b><span>Validasi lalu buat game.</span></li></ol></section><section class="card pad"><h3 class="h-sm">Buka AI favorit</h3>' + AI + '</section></aside></div>' +
+        '<section class="card pad" id="imp"><div class="card-h"><div><h2 class="h-sm">' + ic('bolt', 20) + ' Sudah punya jawaban dari AI?</h2><p class="muted">Tempelkan balasan AI untuk divalidasi dan dijadikan game.</p></div><button class="btn btn-outline btn-sm" id="ex">' + ic('file', 16) + ' Lihat Contoh JSON</button></div><textarea id="ai" class="inp mono" rows="9" placeholder=\'Tempel balasan AI di sini, misalnya: { "meta": {...}, "questions": [...] }\'></textarea><div id="imsg"></div><div class="form-act"><span class="muted">' + ic('checkc', 16) + ' Mendukung JSON murni maupun blok ```json … ```.</span><span><button class="btn btn-soft" id="cl">Bersihkan</button> <button class="btn btn-primary btn-lg glow shine" id="vb">' + ic('bolt', 18) + ' Validasi & Buat Game</button></span></div></section>';
+      pasangTerm(S.promptJson, 'prompt-data-' + eng + '.md');
+      $('#cl', c).addEventListener('click', function () { $('#ai', c).value = ''; $('#imsg', c).innerHTML = ''; });
+      $('#ex', c).addEventListener('click', function () {
+        var json = JSON.stringify(Content.contoh(eng, S.bentuk), null, 2);
+        var m = UI.modal({ title: 'Contoh format JSON', wide: true, body: '<pre class="term small"></pre>', actions: [{ label: 'Tutup', cls: 'btn-outline', onClick: function (x) { x(); } }, { label: 'Pakai contoh ke kolom impor', cls: 'btn-primary', onClick: function (x) { $('#ai', c).value = json; x(); } }] });
+        $('pre', m.body).textContent = json;
+      });
+      $('#vb', c).addEventListener('click', function () {
+        var raw = $('#ai', c).value.trim(), msg = $('#imsg', c), btn = $('#vb', c);
+        if (!raw) { msg.innerHTML = '<div class="note note-err">Kolom masih kosong. Tempel balasan AI terlebih dahulu.</div>'; return; }
+        var obj; try { obj = Content.parseAI(raw); Content.konten(eng, obj); } catch (e) { msg.innerHTML = '<div class="note note-err">' + ic('x', 18) + '<div><b>Belum valid:</b> ' + esc(e.message) + '<br><small>Minta AI memperbaiki: "Perbaiki JSON agar sesuai format dan kirim ulang HANYA JSON-nya."</small></div></div>'; return; }
+        btn.disabled = true;
+        Api.call('konten.validasi', { engine: eng, konten: obj }).then(function (v) {
+          if (!v.success) { btn.disabled = false; msg.innerHTML = '<div class="note note-err">' + esc(v.message) + '</div>'; return; }
+          Api.call('game.create', { meta: metaDari(S), konten: v.data, tautanDasar: App.baseUrl() }).then(function (r) {
+            btn.disabled = false;
+            if (r.success) { simpanProfil(S); App.draft(null); UI.toast('Permainan berhasil dibuat dari hasil AI!'); App.go('/guru/hasil/' + r.data.id); } else msg.innerHTML = '<div class="note note-err">' + esc(r.message) + '</div>';
+          });
         });
       });
-    });
+    }
+    function tampil() { $$('#tb button', c).forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-m') === mode); }); if (mode === 'html') tampilHtml(); else tampilJson(); }
+    $$('#tb button', c).forEach(function (b) { b.addEventListener('click', function () { mode = b.getAttribute('data-m'); S.pmode = mode; App.draft(S); tampil(); }); });
+    tampil();
   };
 
   /* ============================== HASIL & BAGIKAN ============================== */
   function previewHtml(g) {
     var k = g.konten || {}, info = einfo(g.engine);
     var head = '<div class="pv-top"><span class="gi" style="--c:' + ENG_COLOR[g.engine] + '">' + ic(info.ikon, 18) + '</span><div><b>' + esc(g.judul) + '</b><small>Fase ' + esc(g.fase) + ' • ' + esc(g.mapel) + '</small></div><span class="pill">' + g.durasi + ' mnt</span></div>';
+    if (g.engine === 'html') return head + '<div class="pv-q"><span class="pill">Game HTML dari AI</span><h4>' + esc(g.judul) + '</h4><p class="muted">' + (g.sumber && einfo(g.sumber).nama ? 'Gaya: ' + esc(einfo(g.sumber).nama) + '. ' : '') + 'Klik “Uji Coba Main” untuk melihatnya.</p></div>';
     if (k.questions && k.questions[0]) { var q = k.questions[0]; return head + '<div class="pv-q"><span class="pill">Pertanyaan 1 / ' + k.questions.length + '</span><h4>' + esc(q.q) + '</h4></div><div class="pv-opts">' + q.options.map(function (o, i) { return '<div class="pv-o' + (i === q.answer && !g.kunciTersembunyi ? ' hit' : '') + '"><b>' + 'ABCDE'[i] + '</b>' + esc(o) + '</div>'; }).join('') + '</div>'; }
     if (k.pairs) return head + '<div class="pv-pairs">' + k.pairs.slice(0, 6).map(function (x) { return '<div><span>' + esc(x.a) + '</span><i>↔</i><span>' + esc(x.b) + '</span></div>'; }).join('') + '</div>';
     if (k.sequences) return head + '<div class="pv-q"><h4>' + esc(k.sequences[0].title) + '</h4></div><ol class="pv-seq">' + k.sequences[0].steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>';
@@ -273,7 +333,7 @@
         document.body.appendChild(o); UI.qr($('#pq', o), link, 220); function x() { o.remove(); document.removeEventListener('keydown', k); } function k(e) { if (e.key === 'Escape') x(); } document.addEventListener('keydown', k); $('button', o).addEventListener('click', x);
         if (o.requestFullscreen) o.requestFullscreen().catch(function () { });
       });
-      $('#ed', c).addEventListener('click', function () { editor(g); });
+      if (g.engine === 'html') { var eb = $('#ed', c); if (eb) { eb.innerHTML = ic('lock', 18) + ' Game HTML (kode dari AI)'; eb.disabled = true; } } else $('#ed', c).addEventListener('click', function () { editor(g); });
       function poll() { Api.call('hasil.list', { gameId: g.id }, { fresh: true }).then(function (rr) { if (!rr.success) return; var n2 = rr.data.rows.length, a = $('#jn'); if (!a) return; a.textContent = n2 + ' Siswa Selesai'; $('#jt').textContent = n2 ? 'Terakhir: ' + rr.data.rows[0].nama + ' (skor ' + rr.data.rows[0].skor + ')' : 'Menunggu siswa menyelesaikan permainan…'; }); }
       $('#rf', c).addEventListener('click', poll); poll();
       var tm = setInterval(function () { if (!document.hidden) poll(); }, 15000); UI.onCleanup(function () { clearInterval(tm); });
@@ -318,11 +378,12 @@
       $('#sum', c).innerHTML = '<div class="metrics m3">' + '<div class="metric card-fx"><div class="m-top"><span class="m-ic m-blue">' + ic('star', 22) + '</span></div><span class="m-l">RATA-RATA NILAI</span><b class="m-v">' + (n ? avg.toFixed(1).replace('.', ',') : '—') + '<small> / 100</small></b><span class="m-f"><span class="st st-on">Ketuntasan ' + (n ? Math.round(tuntas / n * 100) : 0) + '%</span> ' + tuntas + ' dari ' + n + ' tuntas</span></div>' +
         '<div class="metric card-fx top-y"><div class="m-top"><span class="m-ic m-amber">' + ic('trophy', 22) + '</span></div><span class="m-l">SKOR TERTINGGI</span><b class="m-v">' + (best ? best.skor : '—') + '</b><span class="m-f">' + (best ? esc(best.nama) + ' • ' + UI.fmtDur(best.durasi) : 'Belum ada data') + '</span></div>' +
         '<div class="metric card-fx"><div class="m-top"><span class="m-ic m-red">' + ic('bell', 22) + '</span></div><span class="m-l">PERLU PENDAMPINGAN</span><b class="m-v red">' + butuh + '<small> siswa</small></b><span class="m-f">Kriteria skor &lt; ' + kk + '</span></div></div>';
+      var rankMode = !!$('#fg', c).value; if (rankMode) f = f.slice().sort(function (a, b) { return (b.skor - a.skor) || (a.durasi - b.durasi); });
       var tot = Math.max(1, Math.ceil(n / PER)); page = Math.min(page, tot); var pg = f.slice((page - 1) * PER, page * PER);
       $('#tbl', c).innerHTML = '<div class="card-h"><h2 class="h-sm"><i class="dot"></i> Daftar Hasil Belajar Siswa</h2><span class="pill">' + n + ' hasil</span></div>' +
-        (n ? '<div class="tbl-w"><table class="tbl"><thead><tr><th>Nama Siswa</th><th>Kelas</th><th>Skor Akhir</th><th>Waktu Tempuh</th><th>Akurasi Soal</th><th>Status</th><th class="r">Tindakan</th></tr></thead><tbody>' + pg.map(function (x) {
+        (n ? '<div class="tbl-w"><table class="tbl"><thead><tr>' + (rankMode ? '<th>#</th>' : '') + '<th>Nama Siswa</th><th>Kelas</th><th>Skor Akhir</th><th>Waktu Tempuh</th><th>Akurasi Soal</th><th>Status</th><th class="r">Tindakan</th></tr></thead><tbody>' + pg.map(function (x) {
           var cls = x.skor >= 90 ? 'sk-a' : x.skor >= kk ? 'sk-b' : x.skor >= kk - 10 ? 'sk-c' : 'sk-d';
-          return '<tr><td><div class="gcell"><span class="avs-i">' + esc(x.nama.slice(0, 2).toUpperCase()) + '</span><div><b>' + esc(x.nama) + '</b><small>' + esc(judulOf(x.idPermainan)) + '</small></div></div></td><td>' + esc(x.kelas) + '</td><td><span class="sk ' + cls + '">' + x.skor + '</span></td><td>' + UI.ic('timer', 14) + ' ' + UI.fmtDur(x.durasi) + '</td><td><b>' + x.benar + '</b>/' + x.total + ' Benar</td><td>' + (x.skor >= kk ? '<span class="st st-on">✓ Lulus</span>' : '<span class="st st-warn">⚠ Remedial</span>') + '</td><td class="r"><button class="btn btn-soft btn-sm" data-ans="' + esc(x.id) + '">Lihat Jawaban ' + ic('eye', 14) + '</button></td></tr>';
+          return '<tr>' + (rankMode ? '<td><b>' + (f.indexOf(x) + 1) + '</b></td>' : '') + '<td><div class="gcell"><span class="avs-i">' + esc(x.nama.slice(0, 2).toUpperCase()) + '</span><div><b>' + esc(x.nama) + '</b><small>' + esc(judulOf(x.idPermainan)) + '</small></div></div></td><td>' + esc(x.kelas) + '</td><td><span class="sk ' + cls + '">' + x.skor + '</span></td><td>' + UI.ic('timer', 14) + ' ' + UI.fmtDur(x.durasi) + '</td><td><b>' + x.benar + '</b>/' + x.total + ' Benar</td><td>' + (x.skor >= kk ? '<span class="st st-on">✓ Lulus</span>' : '<span class="st st-warn">⚠ Remedial</span>') + '</td><td class="r"><button class="btn btn-soft btn-sm" data-ans="' + esc(x.id) + '">Lihat Jawaban ' + ic('eye', 14) + '</button></td></tr>';
         }).join('') + '</tbody></table></div><div class="pager"><span>Menampilkan ' + ((page - 1) * PER + 1) + '–' + Math.min(page * PER, n) + ' dari ' + n + ' hasil</span><div>' + (function () { var s = ''; for (var i = 1; i <= tot; i++) if (i === 1 || i === tot || Math.abs(i - page) <= 1) s += '<button class="pg' + (i === page ? ' on' : '') + '" data-pg="' + i + '">' + i + '</button>'; else if (Math.abs(i - page) === 2) s += '<span>…</span>'; return s; })() + '</div></div>' : '<div class="empty sm"><p>Belum ada hasil yang cocok. Bagikan kode permainan agar nilai siswa masuk ke sini.</p></div>');
       $$('[data-pg]', c).forEach(function (b) { b.addEventListener('click', function () { page = +b.getAttribute('data-pg'); draw(); }); });
       $$('[data-ans]', c).forEach(function (b) { b.addEventListener('click', function () { jawaban(data.rows.filter(function (x) { return x.id === b.getAttribute('data-ans'); })[0]); }); });

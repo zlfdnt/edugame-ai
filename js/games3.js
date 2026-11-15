@@ -38,7 +38,7 @@
     var L = g.konten.statements, n = L.length, i = 0, benar = 0, ans = [], t0 = Date.now(), umpan = umpanOf(g), kunci = false;
     function render() {
       var s = L[i]; kunci = false;
-      root.innerHTML = '<div class="arena sk-tf">' + H.top(g, H.chip('flag', (i + 1) + '/' + n)) + '<div class="ar-prog"><i style="width:' + Math.round(i / n * 100) + '%"></i></div><div class="q-card tf-card card-fx shine">' + emo(s.emoji, 'big') + '<p class="muted">Benar atau salah?</p><h2 class="q-text">' + esc(s.text) + '</h2></div><div class="tf-btns"><button class="tf tf-t" data-v="1">' + ic('check', 30) + ' BENAR <kbd>←</kbd></button><button class="tf tf-f" data-v="0">' + ic('x', 30) + ' SALAH <kbd>→</kbd></button></div><div id="fb" class="fb"></div><div class="ar-foot" id="nx" hidden><button class="btn btn-primary btn-lg btn-block glow" id="go"></button></div></div>';
+      root.innerHTML = '<div class="arena sk-tf">' + H.top(g, H.chip('flag', (i + 1) + '/' + n)) + '<div class="ar-prog"><i style="width:' + Math.round(i / n * 100) + '%"></i></div><div class="q-card tf-card card-fx shine">' + emo(s.emoji, 'big') + (s.stimulus ? '<div class="stim"><b>📖 Bacalah dengan teliti</b><p>' + esc(s.stimulus) + '</p></div>' : '') + '<p class="muted">Benar atau salah?</p><h2 class="q-text">' + esc(s.text) + '</h2></div><div class="tf-btns"><button class="tf tf-t" data-v="1">' + ic('check', 30) + ' BENAR <kbd>←</kbd></button><button class="tf tf-f" data-v="0">' + ic('x', 30) + ' SALAH <kbd>→</kbd></button></div><div id="fb" class="fb"></div><div class="ar-foot" id="nx" hidden><button class="btn btn-primary btn-lg btn-block glow" id="go"></button></div></div>';
       UI.bind(root); $$('.tf', root).forEach(function (b) { b.addEventListener('click', function () { jawab(+b.getAttribute('data-v')); }); });
     }
     function jawab(v) {
@@ -58,7 +58,7 @@
     function render() {
       var it = L[i], q = esc(it.q).replace(/_{2,}/g, '<span class="blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>'); sudah = false;
       root.innerHTML = frame(g, H.chip('edit', (i + 1) + '/' + n), i / n * 100, 'sk-isian');
-      $('#stage', root).innerHTML = '<div class="q-card card-fx shine">' + emo(it.emoji, 'big') + '<h2 class="q-text">' + q + '</h2></div><div class="ans-row"><input id="ai" class="inp inp-ans" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="40" placeholder="Ketik jawabanmu di sini…" aria-label="Jawaban">' + (umpan && it.answer ? '<small class="muted">' + it.answer.length + ' huruf</small>' : '') + '</div><button class="btn btn-primary btn-lg btn-block glow" id="ck">Periksa Jawaban ' + ic('check', 20) + '</button>';
+      $('#stage', root).innerHTML = '<div class="q-card card-fx shine">' + emo(it.emoji, 'big') + (it.stimulus ? '<div class="stim"><b>📖 Bacalah dengan teliti</b><p>' + esc(it.stimulus) + '</p></div>' : '') + '<h2 class="q-text">' + q + '</h2></div><div class="ans-row"><input id="ai" class="inp inp-ans" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="40" placeholder="Ketik jawabanmu di sini…" aria-label="Jawaban">' + (umpan && it.answer ? '<small class="muted">' + it.answer.length + ' huruf</small>' : '') + '</div><button class="btn btn-primary btn-lg btn-block glow" id="ck">Periksa Jawaban ' + ic('check', 20) + '</button>';
       UI.bind(root); var inp = $('#ai', root); inp.focus();
       $('#ck', root).addEventListener('click', cek); inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') cek(); });
     }
@@ -77,7 +77,7 @@
     function render() {
       var p = L[i]; buf = ''; kunci = false; left = per;
       root.innerHTML = frame(g, H.chip('timer', '<span id="ht">' + left + '</span> dtk', 'ar-time') + H.chip('fire', streak + ' beruntun'), i / n * 100, 'sk-hitung');
-      $('#stage', root).innerHTML = '<div class="q-card card-fx shine">' + emo(p.emoji, 'big') + '<h2 class="q-text calc">' + esc(p.q) + '</h2><div class="disp" id="dp">&nbsp;</div></div><div class="numpad">' + ['7', '8', '9', '4', '5', '6', '1', '2', '3', ',', '0', '⌫'].map(function (k) { return '<button class="nk" data-k="' + k + '">' + k + '</button>'; }).join('') + '</div><button class="btn btn-primary btn-lg btn-block glow" id="ok">OK ' + ic('check', 20) + '</button>';
+      $('#stage', root).innerHTML = '<div class="q-card card-fx shine">' + emo(p.emoji, 'big') + (p.stimulus ? '<div class="stim"><b>📖 Soal cerita</b><p>' + esc(p.stimulus) + '</p></div>' : '') + '<h2 class="q-text calc">' + esc(p.q) + '</h2><div class="disp" id="dp">&nbsp;</div></div><div class="numpad">' + ['7', '8', '9', '4', '5', '6', '1', '2', '3', ',', '0', '⌫'].map(function (k) { return '<button class="nk" data-k="' + k + '">' + k + '</button>'; }).join('') + '</div><button class="btn btn-primary btn-lg btn-block glow" id="ok">OK ' + ic('check', 20) + '</button>';
       UI.bind(root); $$('.nk', root).forEach(function (b) { b.addEventListener('click', function () { ketik(b.getAttribute('data-k')); }); }); $('#ok', root).addEventListener('click', function () { kirim(false); });
       clearInterval(timer); timer = setInterval(function () { left--; var t = $('#ht', root); if (t) t.textContent = left; if (left <= 5) { var c = $('.ar-time', root); if (c) c.classList.add('warn'); } if (left <= 0) kirim(true); }, 1000);
     }

@@ -8,7 +8,7 @@
   var G = window.Games, H = G.H, sfx = G.sfx, esc = UI.esc, ic = UI.ic, $ = UI.$, $$ = UI.$$, LBL = H.LBL, clamp = H.clamp;
   function emo(e, c) { return e ? '<span class="emo ' + (c || '') + '">' + esc(e) + '</span>' : ''; }
   function umpanOf(g) { return g.asesmen !== 'sumatif' && !g.kunciTersembunyi; }
-  function qcard(q) { return '<div class="q-card card-fx shine">' + emo(q.emoji, 'big') + '<h2 class="q-text">' + esc(q.q) + '</h2></div>'; }
+  function qcard(q) { return '<div class="q-card card-fx shine">' + emo(q.emoji, 'big') + (q.stimulus ? '<div class="stim"><b>📖 Bacalah dengan teliti</b><p>' + esc(q.stimulus) + '</p></div>' : '') + '<h2 class="q-text">' + esc(q.q) + '</h2></div>'; }
   function frame(g, chips, pct, cls) {
     return '<div class="arena ' + (cls || '') + '">' + H.top(g, chips) + '<div class="ar-prog"><i style="width:' + Math.round(pct) + '%"></i></div><div id="stage" class="stage"></div><div id="fb" class="fb"></div><div class="ar-foot" id="nx" hidden><button class="btn btn-primary btn-lg btn-block glow" id="go"></button></div></div>';
   }

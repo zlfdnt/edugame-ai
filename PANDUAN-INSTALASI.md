@@ -1,15 +1,14 @@
-# Panduan Instalasi — EduGame AI (v1.1)
+# Panduan Instalasi — EduGame AI (v1.2)
 
-> ## Sudah memasang v1.0? Lakukan pembaruan ini (±10 menit)
+> ## Sudah memasang versi sebelumnya? Perbarui dengan langkah ini (±10 menit)
 > 1. **Backend:** buka proyek Apps Script → ganti seluruh isi berkas `Kode` dengan `Kode.gs` yang baru → **Save**.
-> 2. Pilih fungsi **`setupAppEnvironment`** → **Run**. Ini menambahkan 18 templat baru (total 24) tanpa menghapus data atau rahasia Anda.
-> 3. *(disarankan)* Pilih fungsi **`nyalakanKeepWarm`** → **Run**. Ini menjaga server tetap hangat sehingga login tidak lambat.
+> 2. Pilih fungsi **`setupAppEnvironment`** → **Run**. Aman diulang: menambah sheet `GameHtml`, empat kolom baru di sheet `Permainan` (sekolah, nama guru, bentuk soal, sumber), dan templat yang belum ada (total 24). Data dan rahasia Anda tidak dihapus.
+> 3. *(disarankan)* Jalankan **`nyalakanKeepWarm`** sekali agar server tetap hangat dan login terasa cepat.
 > 4. **Deploy → Manage deployments → ikon pensil → Version: New version → Deploy.** URL `/exec` tidak berubah.
-> 5. **Frontend:** ekstrak `edugame-frontend.zip`, **salin `js/config.js` lama Anda** (yang sudah berisi `GAS_URL`) menimpa `js/config.js` baru, lalu dari folder itu jalankan `git add .`, `git commit -m "v1.1"`, `git push`.
-> 6. Buka situs, tekan **Ctrl+F5** (muat ulang penuh), lalu buka **Admin → Pengaturan & Rahasia → Tes koneksi AI**.
+> 5. **Frontend:** ekstrak `edugame-frontend.zip`, **salin `js/config.js` lama Anda** (yang berisi `GAS_URL`) menimpa `js/config.js` baru, lalu dari folder itu: `git add .` → `git commit -m "v1.2"` → `git push`.
+> 6. Buka situs, tekan **Ctrl+F5**, lalu coba **Buat Game Baru**.
 >
-> **Yang baru di v1.1:** 24 jenis game, pemilih game dengan pencarian + tombol *Ganti Game*, login Google lebih cepat, pembuatan AI memilih model Gemini otomatis, dan beberapa perbaikan tampilan.
-
+> **Baru di v1.2:** prompt AI yang membuat **game langsung jadi** (bukan JSON) + **papan peringkat** seluruh siswa pada kode yang sama • musik latar berbeda untuk tiap game + latar bertema + maskot & combo • kolom **nama sekolah & guru** • pilihan **bentuk soal** (singkat / narasi-analisis).
 
 Aplikasi ini terdiri dari **dua bagian** yang dipasang terpisah:
 
@@ -143,6 +142,16 @@ Secara bawaan kartu memakai ilustrasi bawaan (3 gambar bergantian otomatis). Unt
 - Mulai v1.1, guru yang sudah terdaftar masuk lewat jalur cepat (tanpa membaca spreadsheet), dan tombol Google muncul tanpa menunggu server.
 - Pastikan guru memilih akun di jendela Google satu kali saja; tombol dinonaktifkan sementara saat verifikasi berlangsung.
 
+### D6. Cara memakai prompt "Game langsung jadi" (disarankan)
+1. **Buat Game Baru** → isi identitas (termasuk **nama sekolah & guru**) → pilih game → atur **bentuk soal** (singkat / narasi-analisis) → **Salin Prompt untuk AI**.
+2. Di halaman prompt, tab **🎮 Game langsung jadi** sudah aktif. Klik **Salin Seluruh Prompt**.
+3. Tempel ke ChatGPT / Gemini / Claude lalu tekan **Enter**. AI membuat **satu berkas HTML = game utuh**, bukan JSON. Banyak AI menampilkan pratinjau yang bisa langsung dimainkan (mis. fitur Canvas atau Artifacts bila tersedia di akun Anda); nama dan ketersediaan fitur ini dapat berbeda antar AI dan antar waktu.
+4. Belum puas? Minta AI memperbaiki ("buat lebih meriah", "perbaiki bug ..."). Prompt sudah memuat aturan agar tetap kompatibel.
+5. Salin **seluruh balasan** (boleh beserta blok ```html) → tempel di kotak "Sudah punya game dari AI?" (atau unggah `.html`) → **Uji Coba** → **Terbitkan Game**.
+6. Bagikan **kode / QR**. Siswa memasukkan nama, bermain, dan nilai langsung masuk **Rekap Nilai**. Di akhir, semua siswa melihat **Papan Peringkat** seluruh peserta kode itu.
+- **Tidak punya waktu / AI gagal?** Tombol **Muat contoh game** mengisi kotak dengan contoh game yang sudah benar untuk melihat hasil yang diharapkan.
+- Tab **📋 Format data (JSON)** tetap ada untuk memakai 24 mesin bawaan; dan tombol **Buat Game Langsung** (Gemini) bekerja di balik layar tanpa Anda melihat JSON.
+
 ## E. Daftar Uji Cepat
 - [ ] Beranda terbuka, slideshow hero bergerak, kartu templat bergantian gambar.
 - [ ] Masuk (Google/darurat) berhasil → Dashboard tampil.
@@ -166,10 +175,17 @@ Setelah mengedit `Kode.gs`: **Deploy → Manage deployments → ikon pensil → 
 | Setelah ubah kode, perilaku lama | Belum deploy versi baru | Bagian F |
 | QR / Excel / PDF tidak muncul | Pustaka CDN diblokir jaringan | Cek koneksi; Excel otomatis jatuh ke CSV |
 | Lupa kata sandi darurat | — | Jalankan `resetAksesDarurat` di editor Apps Script |
+| Game HTML tampil kosong / tidak bisa diklik | Kode terpotong saat disalin, atau memakai pustaka/gambar dari internet | Salin ulang dari `<!DOCTYPE html>` sampai `</html>`; minta AI: "buat versi mandiri tanpa sumber eksternal" |
+| Nilai siswa tidak masuk dari game HTML | Game tidak memanggil `EduGame.finish(...)` | Minta AI menambahkannya (aplikasi memberi peringatan saat Anda menempel kodenya) |
+| Peringkat belum menampilkan siswa terbaru | Cache peringkat 15 detik | Klik **Muat ulang peringkat** |
 
 ## H. Batasan yang Perlu Diketahui
 - **24 mesin permainan** tersedia: kuis kilat, teka-teki silang, kartu memori, duel tim, susun balok, labirin, benar/salah, jodohkan, anagram, tebak kata (gantung), cari kata, isi titik-titik, kelompokkan, pecahkan balon, pukul tikus, roda putar, kotak misteri, pesawat, katak loncat, roket, balap mobil, ular tangga, hitung cepat, dan kartu kilat. Templat tambahan di Admin memetakan nama/gambar ke salah satu mesin ini.
-- Seluruh mesin dirender oleh aplikasi dari **konten JSON** yang dihasilkan AI (tampilan, animasi, suara, dan poin dibuat aplikasi). AI tidak menulis kode game.
+- **Dua cara membuat game:** (1) *Game langsung jadi* — AI menulis game HTML utuh yang dijalankan di kotak aman (iframe sandbox, tanpa internet); kualitas dan bug bergantung pada AI yang dipakai, jadi selalu **Uji Coba** sebelum menerbitkan. (2) *Mesin bawaan* — AI/Gemini hanya mengisi data, game dirender oleh 24 mesin aplikasi yang sudah diuji.
+- Skor game HTML dan banyak jenis game bawaan dilaporkan dari perangkat siswa (bisa dimanipulasi siswa yang mahir teknis); gunakan untuk latihan/formatif. Hanya game berbasis soal, benar/salah, isian, dan hitung yang dinilai ulang oleh server.
+- Satu berkas game HTML maksimal ±350.000 karakter; penyimpanan memakai sheet `GameHtml` (dipotong per 45.000 karakter).
+- Peringkat memakai skor terbaik tiap siswa (nama + kelas) pada kode yang sama; skor sama → yang lebih cepat di atas. Siswa dengan nama berbeda ejaan dihitung berbeda.
+- Musik latar dibuat prosedural di browser (tanpa berkas audio) dan berbeda untuk tiap game; ada tombol 🎵/🔊 untuk mematikannya. Browser baru mengizinkan suara setelah siswa menekan tombol Mulai.
 - Pada asesmen **sumatif**, kunci jawaban disembunyikan dari siswa dan skor dihitung ulang server untuk semua game berbasis soal, benar/salah, isian, dan hitung. Game lain (memori, kata, urutan, kelompok, dll.) menilai di sisi siswa sehingga lebih cocok untuk formatif. **Duel** juga dinilai di sisi layar bersama.
 - **Kartu Kilat** adalah penilaian mandiri siswa (jujur-jujuran), bukan skor objektif.
 - Siswa tanpa login: nama bisa diisi siapa pun. Gunakan sebagai alat belajar, bukan bukti identitas.

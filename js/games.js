@@ -53,7 +53,7 @@
       var q = Q[i], pct = Math.round(i / n * 100);
       root.innerHTML = '<div class="arena">' + top(g, chip('timer', '<span id="kt">' + left + '</span> dtk', 'ar-time') + chip('star', '<span id="kp">' + pts + '</span> Poin', 'ar-pts')) +
         '<div class="ar-prog"><i style="width:' + pct + '%"></i></div><div class="ar-sub"><span class="pill">Soal ' + (i + 1) + ' / ' + n + '</span>' + (streak >= 2 ? '<span class="pill pill-fire">' + ic('fire', 14) + ' ' + streak + 'x combo</span>' : '') + '</div>' +
-        '<div class="q-card card-fx shine">' + (q.emoji ? '<span class="emo big">' + esc(q.emoji) + '</span>' : '') + '<h2 class="q-text">' + esc(q.q) + '</h2></div><div class="opts" role="listbox">' +
+        '<div class="q-card card-fx shine">' + (q.emoji ? '<span class="emo big">' + esc(q.emoji) + '</span>' : '') + (q.stimulus ? '<div class="stim"><b>📖 Bacalah dengan teliti</b><p>' + esc(q.stimulus) + '</p></div>' : '') + '<h2 class="q-text">' + esc(q.q) + '</h2></div><div class="opts" role="listbox">' +
         q.options.map(function (o, k) { return '<button class="opt card-fx" role="option" data-k="' + k + '"><span class="opt-l">' + LBL[k] + '</span><span class="opt-t">' + esc(o) + '</span><span class="opt-s"></span></button>'; }).join('') + '</div>' +
         '<div class="ar-foot"><div id="fb" class="fb"></div><button class="btn btn-primary btn-lg btn-block glow" id="go" disabled>Kirim & Lanjut ' + ic('arrow', 20) + '</button></div></div>';
       UI.bind(root); wire(); sel = -1; kunci = false; left = per; startTimer();
@@ -123,7 +123,7 @@
       var q = Q[i], beda = sc[0] - sc[1], pos = clamp(50 + beda / Math.max(1, n * 10) * 50, 6, 94);
       root.innerHTML = '<div class="arena arena-wide">' + top(g, chip('flag', 'Soal ' + (i + 1) + '/' + n)) +
         '<div class="tug"><div class="tug-bar"><i style="width:' + pos + '%"></i><b style="left:' + pos + '%"></b></div><div class="tug-names"><span class="t1">' + esc(teams[0]) + ' <em>' + sc[0] + '</em></span><span class="t2"><em>' + sc[1] + '</em> ' + esc(teams[1]) + '</span></div></div>' +
-        '<div class="q-card card-fx shine"><h2 class="q-text">' + esc(q.q) + '</h2><div class="duel-timer" id="dt"></div></div>' +
+        '<div class="q-card card-fx shine">' + (q.stimulus ? '<div class="stim"><b>📖 Bacalah dengan teliti</b><p>' + esc(q.stimulus) + '</p></div>' : '') + '<h2 class="q-text">' + esc(q.q) + '</h2><div class="duel-timer" id="dt"></div></div>' +
         '<div class="opts opts-2" id="dopts">' + q.options.map(function (o, k) { return '<button class="opt" data-k="' + k + '" disabled><span class="opt-l">' + LBL[k] + '</span><span class="opt-t">' + esc(o) + '</span></button>'; }).join('') + '</div>' +
         '<div class="buzzers"><button class="buzz b1 glow" data-t="0"><b>' + esc(teams[0]) + '</b><small>Tekan atau tombol <kbd>Q</kbd></small></button><button class="buzz b2 glow" data-t="1"><b>' + esc(teams[1]) + '</b><small>Tekan atau tombol <kbd>P</kbd></small></button></div><div id="dmsg" class="fb">Siapa tercepat? Tekan buzzer tim kamu!</div></div>';
       UI.bind(root); fase = 'buzz'; pemegang = -1; sudah = [];
@@ -369,7 +369,7 @@
       if (qi >= n) { return maju(L - 1, selesai); }
       maju(Math.max(0, gates[qi] - 1), function () {
         var q = Q[qi]; kunci = false;
-        $('#qp', root).innerHTML = '<div class="q-card card-fx shine"><span class="pill">Gerbang ' + (qi + 1) + ' dari ' + n + '</span><h2 class="q-text">' + esc(q.q) + '</h2></div><div class="opts opts-2">' + q.options.map(function (o, kk) { return '<button class="opt card-fx" data-k="' + kk + '"><span class="opt-l">' + LBL[kk] + '</span><span class="opt-t">' + esc(o) + '</span></button>'; }).join('') + '</div><div id="fb" class="fb"></div>';
+        $('#qp', root).innerHTML = '<div class="q-card card-fx shine"><span class="pill">Gerbang ' + (qi + 1) + ' dari ' + n + '</span>' + (q.stimulus ? '<div class="stim"><b>📖 Bacalah dengan teliti</b><p>' + esc(q.stimulus) + '</p></div>' : '') + '<h2 class="q-text">' + esc(q.q) + '</h2></div><div class="opts opts-2">' + q.options.map(function (o, kk) { return '<button class="opt card-fx" data-k="' + kk + '"><span class="opt-l">' + LBL[kk] + '</span><span class="opt-t">' + esc(o) + '</span></button>'; }).join('') + '</div><div id="fb" class="fb"></div>';
         UI.bind(root);
         $$('.opt', root).forEach(function (b) { b.addEventListener('click', function () { if (!kunci) jawab(+b.getAttribute('data-k')); }); });
       });
